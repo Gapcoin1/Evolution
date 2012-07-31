@@ -6,28 +6,79 @@
 #ifndef EVOLUTION
 #define EVOLUTION
 #include <pthread.h>
-#include "maze.c"
 
 /**
- * An Maze individual wich has an definied fitness
+ * Some Makros
+ */
+#define EVOLUTION_TRUE  1
+#define EVOLUTION_FALSE 0
+
+/**
+ * Macros for Sorting the Maze Population by Fitness
+ */
+#define CHIEFSORT_TYPE MazeIndividual *
+#define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
+#define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
+#define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
+#define MAZE_EV_MIN_QUICKSORT 20
+#include "sort.c"
+
+/**
+ * Sorts the best Individual at top of the population array
+ */
+#define EVOLUTION_SELECTION(EVOLUTION) \
+  chiefsort(EVOLUTION->population, EVOLUTION->population_size, MAZE_EV_MIN_QUICKSORT);
+
+/**
+ * An Individual wich has an definied fitness
  * as higher as longer it lives
  */
 typedef struct {
-  Maze maze;              /* the Maze of this Individual */
-  unsigned int fitness;   /* the fitness of this Individual */
-} MazeIndividual;
+  void *individual;         /* void pointer to the Individual */
+  long fitness;             /* the fitness of this Individual */
+  void *mutate_args;        /* pointer to aditional args for the mutation function */
+  void *fitness_args;       /* pointer to aditional args for the fitness function */
+  void *recombination_args; /* pointer to aditional args for the recombination function */
+} Individual;
 
 /**
- * Structur holding the Maze population
- * and mutation and fitness function
+ * Structur holding the Individual Population.
+ * It also holds an recombination, mutation and fitness function
+ * So as an Mutation probability
+ *
+ * fitness function takes an Individual and should return the strength (fitness) of it
+ * mutation function takes an Individual and should mutate it in an specific way
+ * recombination function takes three Individuals frist and second should be cobinated
+ * and saved in the thierd Individual (recombination function must not initialize the thierd Individual)
+ *
+ * the init Individual function should return an pointer to an initialized individual
+ * (void pointer individual of Individual struct)
+ *
+ * the new born individuals are 1 - death_percentage, what means the Population keeps their size
  */
-typedef struct {
-  MazeIndividual **population;  /* Population of Maze individuals only pointers for faster sorting */
-  MazeIndividual *individuals;  /* The Maze Individuals */
-  int population_size;          /* Population size */
-  void (*mutate) (Maze *);      /* mutation function */
-  int (*fitness) (Maze *);      /* fittnes function */
-} MazeEvolution;
+typedef struct Evolution Evolution;
+struct Evolution {
+  void *(*init_individual) ();             /* function to initialzes an Individual */
+  void (*clone_individual) (void *,        /* function clones an individual */
+                             void *);      /* first Individual is destination second is source */
+  void (*free_individual) (void *);        /* function to free (kill) an Individual */
+  Individual **population;                 /* Population of Individuals only pointers for faster sorting */
+  Individual *individuals;                 /* The Individuals */
+  int population_size;                     /* Population size */
+  void (*recombinate) (Individual *,       
+           Individual *, Individual *);    /* recombination function(src1, src2, dst) */
+  void (*mutate) (Individual *);           /* mutation function */
+  int (*fitness) (Individual *);           /* fittnes function */
+  char use_recmbination;                   /* indicates wether to use recombination or not */
+  char use_muttation;                      /* indicates wether to use mutation or not */
+  char always_mutate;                      /* indicates wheter to always mutate or use probability */
+  char keep_last_generation;               /* indicates wheter to disgard last generation or not */
+  double mutation_propability;             /* the probability of an Individual to mutate */
+  double death_percentage;                 /* the percent of Individual that die during an generation change */
+  char (*abort_requirement) (Evolution *)  /* abort_requirement function should return 0 to abort 1 to continue */
+  char use_abort_requirement               /* if not true calculation will go on until generation limit es reatched */
+  int generation_limit                     /* maximum of generations to calculate */
+};
 
 /**
  * Thread structur for paralell mutation
@@ -53,16 +104,6 @@ typedef struct {
 // Mutex
 pthread_mutex_t mazeev_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-
-/**
- * Macros for Sorting the Maze Population by Fitness
- */
-#define CHIEFSORT_TYPE MazeIndividual *
-#define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
-#define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
-#define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
-#define MAZE_EV_MIN_QUICKSORT 20
-#include "sort.c"
 
 // functions
 void init_mazeevolution(MazeEvolution *mazeev, int size, int num_threads,
