@@ -24,6 +24,24 @@
 #include "sort.c"
 
 /**
+ * Flags for the new_evolution function
+ */
+#define EV_USE_RECOMBINATION      1
+#define EV_USE_MUTATION           2
+#define EV_ALWAYS_MUTATE          4
+#define EV_KEEP_LAST_GENERATION   8
+#define EV_USE_ABORT_REQUIREMENT  16
+
+/**
+ * Shorter Flags
+ */
+#define EV_UREC EV_USE_RECOMBINATION
+#define EV_UMUT EV_USE_MUTATION
+#define EV_AMUT EV_ALWAYS_MUTATE
+#define EV_KEEP EV_KEEP_LAST_GENERATION
+#define EV_ABRT EV_USE_ABORT_REQUIREMENT
+
+/**
  * Sorts the best Individual at top of the population array
  */
 #define EVOLUTION_SELECTION(EVOLUTION) \
@@ -79,6 +97,33 @@ struct Evolution {
   char use_abort_requirement               /* if not true calculation will go on until generation limit es reatched */
   int generation_limit                     /* maximum of generations to calculate */
 };
+
+Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
+                          void (*free_individual) (void *), void (*mutate) (Individual *),
+                            int (*fitness) (Individual *), void (*recombinate) (Individual *,
+                              Individual *, Individual *), void (*abort_requirement) (Evolution *),
+                                int population_size, int generations_limit, double mutation_propability,
+                                  double death_percentage, char flags) {
+
+  Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
+
+  ev->init_individual       = init_individual;
+  ev->clone_individual      = clone_individual;
+  ev->free_individual       = free_individual;
+  ev->mutate                = mutate;
+  ev->fitness               = fitness;
+  ev->recombinate           = recombinate;
+  ev->abort_requirement     = abort_requirement;
+  ev->population_size       = population_size;
+  ev->generations_limit     = generations_limit;
+  ev->mutation_propability  = mutation_propability;
+  ev->death_percentage      = death_percentage;
+  ev->use_recmbination      = flags & EV_USE_RECOMBINATION;
+  ev->use_muttation         = flags & EV_USE_MUTATION;
+  ev->always_mutate         = flags & EV_ALWAYS_MUTATE;
+  ev->keep_last_generation  = flags & EV_KEEP_LAST_GENERATION;
+  ev->use_abort_requirement = flags & EV_USE_ABORT_REQUIREMENT;
+}
 
 /**
  * Thread structur for paralell mutation
