@@ -20,7 +20,7 @@
 #define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
 #define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
 #define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
-#define MAZE_EV_MIN_QUICKSORT 20
+#define EV_MIN_QUICKSORT 20
 #include "sort.c"
 
 /**
@@ -45,7 +45,7 @@
  * Sorts the best Individual at top of the population array
  */
 #define EVOLUTION_SELECTION(EVOLUTION) \
-  chiefsort(EVOLUTION->population, EVOLUTION->population_size, MAZE_EV_MIN_QUICKSORT);
+  chiefsort(EVOLUTION->population, EVOLUTION->population_size, EV_MIN_QUICKSORT);
 
 /**
  * An Individual wich has an definied fitness
@@ -98,10 +98,116 @@ struct Evolution {
   int generation_limit                     /* maximum of generations to calculate */
 };
 
+/**
+ * Returns pointer to an new and initialzed Evolution
+ * take pointers for varius functions:
+ *
+ * +----------------------------------------------+------------------------------------------------------+
+ * function pointer                               | describtion                                          |
+ * +----------------------------------------------+------------------------------------------------------+
+ * | void *init_individual()                      | should return an void pointer to an new initialized  |
+ * |                                              | individual                                           |
+ * |                                              |                                                      |
+ * | void clone_individual(void *dst, void *src)  | takes two void pointer to individuals and should     |
+ * |                                              | clone the content of the second one                  |
+ * |                                              | into the first one                                   |
+ * |                                              |                                                      |
+ * | void free_individual(void *src)              | takes an void pointer to individual and should free  |
+ * |                                              | the spaces allocated by the given individual         |
+ * |                                              |                                                      |
+ * | void mutate(void *src)                       | takes an void pointer to an individual and should    |
+ * |                                              | change it in a way that the probability to           |
+ * |                                              | improove it is around 1/5                            |
+ * |                                              |                                                      |
+ * | int fitness(vid *src)                        | takes an void pointer to an individual, and should   |
+ * |                                              | return an integer value that indicates how strong    |
+ * |                                              | (good / improoved / near by an optimal solution) it  |
+ * |                                              | is, as higher as better                              |
+ * |                                              |                                                      |
+ * | void recombinate(void *src1, void *src2,     | takes three void pointer to individuals and should   |
+ * |                                   void *dst) | combinate the first two one, and should save the     |
+ * |                                              | result in the thired one. As mutate the probability  |
+ * |                                              | to get an improoved individuals should be around 1/5 |
+ * |                                              |                                                      |
+ * | char abort_requirement(Evolution *ev)        | takes an pointer to the current Evolution struct and |
+ * |                                              | should return 1 if the calculaten should stop and    |
+ * |                                              | 0 if the calculaten should continue                  |
+ * +----------------------------------------------+------------------------------------------------------+
+ *
+ * Note: the void pointer to individuals are not pointer to an Individual struct, theu are the individual element
+ *        of the Individual struct
+ * flags can be:
+ *
+ *    EV_UREC / EV_USE_RECOMBINATION
+ *    EV_UMUT / EV_USE_MUTATION
+ *    EV_AMUT / EV_ALWAYS_MUTATE
+ *    EV_KEEP / EV_KEEP_LAST_GENERATION
+ *    EV_ABRT / EV_USE_ABORT_REQUIREMENT
+ *
+ * The floowing flag combinations are possible:
+ *
+ * +-------------------------------------------+---------------------------------------------------------+
+ * | Flag combination                          | descrion                                                |
+ * +-------------------------------------------+---------------------------------------------------------+
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT   | Recombinate and always mutate individual,               |
+ * |                                           | keep last generation, and use abort requirement         |
+ * |                                           | function                                                |
+ * |                                           |                                                         |
+ * | EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT           | Onley mutate individual keep last generation and use    |
+ * |                                           | abort requirement function                              |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT           | Recombinate and maybe mutate individual (depending on   |
+ * |                                           | a given probability) keep last generation and use       |
+ * |                                           | abort requirement function                              |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_KEEP|EV_ABRT                   | Recombinate individuals, keep last generation and use   |
+ * |                                           | abort requirement function)                             |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT           | Recombinate and always mutate individuals, disgard      |
+ * |                                           | last generation. and use abort requirement function     |
+ * |                                           |                                                         |
+ * | EV_UMUT|EV_AMUT|EV_ABRT                   | Onely mutate individuals, disgard last generation,      |
+ * |                                           | and use abort requirement function                      |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_UMUT|EV_ABRT                   | Recombinate and maybe mutate individuals (depending     |
+ * |                                           | on a given probability), disgard last generation and    |
+ * |                                           | use abort requirement function                          |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_ABRT                           | Recombinate individuals, disgard last generation and    |
+ * |                                           | use abort requirement function                          |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP           | Recombinate and always mutate individuals, keep last    |
+ * |                                           | generation, and calc until generation limit is          |
+ * |                                           | reatched                                                |
+ * |                                           |                                                         |
+ * | EV_UMUT|EV_AMUT|EV_KEEP                   | Onely mutate individuals, keep last generation and      |
+ * |                                           | calc until generation limit is reatched                 |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_UMUT|EV_KEEP                   | Recombinate and maybe mutate individuals, keep last     |
+ * |                                           | generation and calc until generation limit is           |
+ * |                                           | reatched                                                |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_KEEP                           | Recombinate individuals, keep last generation and       |
+ * |                                           | calc until generation limit is reatched                 |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_UMUT|EV_AMUT                   | Recombinate and always mutate individuals, disgard last |
+ * |                                           | generation and calc until generation imit is reatched   |
+ * |                                           |                                                         |
+ * | EV_UMUT|EV_AMUT                           | Recombinate and always mutate Individuals disgard orld  |
+ * |                                           | generation and calc until generation limit is reatched  |
+ * |                                           |                                                         |
+ * | EV_UREC|EV_UMUT                           | Recombinate and maybe mutate Individual (depending on a |
+ * |                                           | given probability) disgard old generation and calc      |
+ * |                                           | until generation limit is reatched                      |
+ * |                                           |                                                         |
+ * | EV_UREC                                   | Recombinate Individual onley disgard old generation and |
+ * |                                           | calc until generation limit is reatched                 |
+ * +-------------------------------------------+---------------------------------------------------------+
+ */
 Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
                           void (*free_individual) (void *), void (*mutate) (Individual *),
                             int (*fitness) (Individual *), void (*recombinate) (Individual *,
-                              Individual *, Individual *), void (*abort_requirement) (Evolution *),
+                              Individual *, Individual *), char (*abort_requirement) (Evolution *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, char flags) {
 
@@ -123,6 +229,15 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   ev->always_mutate         = flags & EV_ALWAYS_MUTATE;
   ev->keep_last_generation  = flags & EV_KEEP_LAST_GENERATION;
   ev->use_abort_requirement = flags & EV_USE_ABORT_REQUIREMENT;
+
+  ev->population  = (Individual **) malloc(sizeof(Individual *) * population_size);
+  ev->individuals = (Individual *) malloc(sizeof(Individual) * population_size);
+
+  int i;
+  for (i = 0; i < population_size; i++) {
+    ev->population[i] = ev->individuals + i;
+    ev->individuals[i].individual = init_individual();
+  }
 }
 
 /**
