@@ -91,7 +91,7 @@ void insertionsort(CHIEFSORT_TYPE *ary, int length) {
     temp = ary[i];
     j = i - 1;
 
-    while (temp < ary[j] && j >= 0) {
+    while (j >= 0 && CHIEFSORT_SMALER(temp, ary[j])) {
       ary[j + 1] = ary[j];
       j = j - 1;
     }   

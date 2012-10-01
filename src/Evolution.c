@@ -116,22 +116,32 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
                                   double death_percentage, char flags) {
 
   // valid flag combination ?
-  if (flags != EV_UREC || flags != (EV_UREC|EV_UMUT) || flags != (EV_UREC|EV_UMUT|EV_AMUT)
-       || flags != (EV_UREC|EV_KEEP) || flags != (EV_UREC|EV_UMUT|EV_KEEP)
-        || flags != (EV_UMUT|EV_AMUT|EV_KEEP) || flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)
-         || flags != (EV_UREC|EV_ABRT) || flags != (EV_UREC|EV_UMUT|EV_ABRT)
-          || flags != (EV_UMUT|EV_AMUT|EV_ABRT) || flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)
-           || flags != (EV_UREC|EV_KEEP|EV_ABRT) || flags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)
-            || flags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)
-              || flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)) {
+  if (flags != EV_UREC && flags != (EV_UREC|EV_UMUT) && flags != (EV_UREC|EV_UMUT|EV_AMUT)
+       && flags != (EV_UREC|EV_KEEP) && flags != (EV_UREC|EV_UMUT|EV_KEEP)
+        && flags != (EV_UMUT|EV_AMUT|EV_KEEP) && flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)
+         && flags != (EV_UREC|EV_ABRT) && flags != (EV_UREC|EV_UMUT|EV_ABRT)
+          && flags != (EV_UMUT|EV_AMUT|EV_ABRT) && flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)
+           && flags != (EV_UREC|EV_KEEP|EV_ABRT) && flags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)
+            && flags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)
+              && flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)) {
+    
+    #ifdef DEBUG
+      printf("[DEBUG] wrong flag combination\n");
+    #endif
 
     return NULL;
   }
 
   // valid other opts
   if (population_size <= 0 || generation_limit <= 0 || mutation_propability < 0.0 
-        || mutation_propability > 1.0 || death_percentage < 0.0 || death_percentage > 1.0)
+        || mutation_propability > 1.0 || death_percentage < 0.0 || death_percentage > 1.0) {
+   
+    #ifdef DEBUG
+      printf("[DEBUG] wrong opts\n");
+    #endif
+
     return NULL;
+  }
   
   // int random
   srand(time(NULL));
@@ -196,7 +206,7 @@ Individual *evolute(Evolution *ev) {
 
     // calculates the fitness for each Individual
     for (j = 0; j < ev->population_size; j++)
-      ev->fitness(ev->population[j]);
+      ev->population[j]->fitness = ev->fitness(ev->population[j]);
   
     /**
      * Select the best individuals to survive,
@@ -314,6 +324,5 @@ Individual best_evolution(void *(*init_individual) (), void (*clone_individual) 
   return best;
 }
 
-int main() { return 0; }
 
 #endif // end of EVOLUTION
