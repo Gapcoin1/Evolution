@@ -33,12 +33,6 @@
 #define EV_ABRT EV_USE_ABORT_REQUIREMENT
 
 /**
- * Sorts the best Individual at top of the population array
- */
-#define EVOLUTION_SELECTION(EVOLUTION) \
-  chiefsort(EVOLUTION->population, EVOLUTION->population_size, EV_MIN_QUICKSORT);
-
-/**
  * An Individual wich has an definied fitness
  * as higher as longer it lives
  */
@@ -56,6 +50,12 @@ typedef struct {
 #define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
 #define EV_MIN_QUICKSORT 20
 #include "sort.c"
+
+/**
+ * Sorts the best Individual at top of the population array
+ */
+#define EVOLUTION_SELECTION(EVOLUTION) \
+  chiefsort(EVOLUTION->population, EVOLUTION->population_size, EV_MIN_QUICKSORT);
 
 /**
  * Structur holding the Individual Population.
