@@ -14,7 +14,7 @@
 #define EVOLUTION_FALSE 0
 
 /**
- * Macros for Sorting the Maze Population by Fitness
+ * Macros for Sorting the Population by Fitness
  */
 #define CHIEFSORT_TYPE MazeIndividual *
 #define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
@@ -54,9 +54,6 @@
 typedef struct {
   void *individual;         /* void pointer to the Individual */
   long fitness;             /* the fitness of this Individual */
-  void *mutate_args;        /* pointer to aditional args for the mutation function */
-  void *fitness_args;       /* pointer to aditional args for the fitness function */
-  void *recombination_args; /* pointer to aditional args for the recombination function */
 } Individual;
 
 /**
@@ -76,26 +73,26 @@ typedef struct {
  */
 typedef struct Evolution Evolution;
 struct Evolution {
-  void *(*init_individual) ();             /* function to initialzes an Individual */
-  void (*clone_individual) (void *,        /* function clones an individual */
-                             void *);      /* first Individual is destination second is source */
-  void (*free_individual) (void *);        /* function to free (kill) an Individual */
-  Individual **population;                 /* Population of Individuals only pointers for faster sorting */
-  Individual *individuals;                 /* The Individuals */
-  int population_size;                     /* Population size */
-  void (*recombinate) (Individual *,       
-           Individual *, Individual *);    /* recombination function(src1, src2, dst) */
-  void (*mutate) (Individual *);           /* mutation function */
-  int (*fitness) (Individual *);           /* fittnes function */
-  char use_recmbination;                   /* indicates wether to use recombination or not */
-  char use_muttation;                      /* indicates wether to use mutation or not */
-  char always_mutate;                      /* indicates wheter to always mutate or use probability */
-  char keep_last_generation;               /* indicates wheter to disgard last generation or not */
-  double mutation_propability;             /* the probability of an Individual to mutate */
-  double death_percentage;                 /* the percent of Individual that die during an generation change */
-  char (*abort_requirement) (Evolution *)  /* abort_requirement function should return 0 to abort 1 to continue */
-  char use_abort_requirement               /* if not true calculation will go on until generation limit es reatched */
-  int generation_limit                     /* maximum of generations to calculate */
+  void *(*init_individual) ();              /* function to initialzes an Individual */
+  void (*clone_individual) (void *,         /* function clones an individual */
+                             void *);       /* first Individual is destination second is source */
+  void (*free_individual) (void *);         /* function to free (kill) an Individual */
+  Individual **population;                  /* Population of Individuals only pointers for faster sorting */
+  Individual *individuals;                  /* The Individuals */
+  int population_size;                      /* Population size */
+  void (*recombinate) (Individual *,        
+           Individual *, Individual *);     /* recombination function(src1, src2, dst) */
+  void (*mutate) (Individual *);            /* mutation function */
+  int (*fitness) (Individual *);            /* fittnes function */
+  char use_recmbination;                    /* indicates wether to use recombination or not */
+  char use_muttation;                       /* indicates wether to use mutation or not */
+  char always_mutate;                       /* indicates wheter to always mutate or use probability */
+  char keep_last_generation;                /* indicates wheter to disgard last generation or not */
+  double mutation_propability;              /* the probability of an Individual to mutate */
+  double death_percentage;                  /* the percent of Individual that die during an generation change */
+  char (*abort_requirement) (Individual *)  /* abort_requirement function should return 0 to abort 1 to continue */
+  char use_abort_requirement                /* if not true calculation will go on until generation limit es reatched */
+  int generation_limit                      /* maximum of generations to calculate */
 };
 
 /**
@@ -119,7 +116,7 @@ struct Evolution {
  * |                                              | change it in a way that the probability to           |
  * |                                              | improove it is around 1/5                            |
  * |                                              |                                                      |
- * | int fitness(vid *src)                        | takes an void pointer to an individual, and should   |
+ * | int fitness(void *src)                       | takes an void pointer to an individual, and should   |
  * |                                              | return an integer value that indicates how strong    |
  * |                                              | (good / improoved / near by an optimal solution) it  |
  * |                                              | is, as higher as better                              |
@@ -129,7 +126,7 @@ struct Evolution {
  * |                                              | result in the thired one. As mutate the probability  |
  * |                                              | to get an improoved individuals should be around 1/5 |
  * |                                              |                                                      |
- * | char abort_requirement(Evolution *ev)        | takes an pointer to the current Evolution struct and |
+ * | char abort_requirement(Individual *ivs)      | takes an pointer to the current Individuals and      |
  * |                                              | should return 1 if the calculaten should stop and    |
  * |                                              | 0 if the calculaten should continue                  |
  * +----------------------------------------------+------------------------------------------------------+
@@ -207,9 +204,22 @@ struct Evolution {
 Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
                           void (*free_individual) (void *), void (*mutate) (Individual *),
                             int (*fitness) (Individual *), void (*recombinate) (Individual *,
-                              Individual *, Individual *), char (*abort_requirement) (Evolution *),
+                              Individual *, Individual *), char (*abort_requirement) (Individual *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, char flags) {
+
+  // valid flag combination ?
+  if (flags != EV_UREC || flags != EV_UREC|EV_UMUT || flags != EV_UREC|EV_UMUT|EV_AMUT
+       || flags != EV_UREC|EV_KEEP || flags != EV_UREC|EV_UMUT|EV_KEEP 
+        || flags != EV_UMUT|EV_AMUT|EV_KEEP || flags != EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP
+         || flags != EV_UREC|EV_ABRT || flags != EV_UREC|EV_UMUT|EV_ABRT 
+          || flags != EV_UMUT|EV_AMUT|EV_ABRT || flags != EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT
+           || flags != EV_UREC|EV_KEEP|EV_ABRT || flags != EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT
+            || flags != EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT 
+              || flags != EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT) {
+
+    return NULL;
+  }
 
   Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
 
@@ -238,6 +248,8 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
     ev->population[i] = ev->individuals + i;
     ev->individuals[i].individual = init_individual();
   }
+
+  return ev;
 }
 
 /**
