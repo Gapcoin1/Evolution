@@ -112,24 +112,24 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
                           void (*free_individual) (void *), void (*mutate) (Individual *),
                             int (*fitness) (Individual *), void (*recombinate) (Individual *,
                               Individual *, Individual *), char (*continue_ev) (Individual *),
-                                int population_size, int generations_limit, double mutation_propability,
+                                int population_size, int generation_limit, double mutation_propability,
                                   double death_percentage, char flags) {
 
   // valid flag combination ?
-  if (flags != EV_UREC || flags != EV_UREC|EV_UMUT || flags != EV_UREC|EV_UMUT|EV_AMUT
-       || flags != EV_UREC|EV_KEEP || flags != EV_UREC|EV_UMUT|EV_KEEP 
-        || flags != EV_UMUT|EV_AMUT|EV_KEEP || flags != EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP
-         || flags != EV_UREC|EV_ABRT || flags != EV_UREC|EV_UMUT|EV_ABRT 
-          || flags != EV_UMUT|EV_AMUT|EV_ABRT || flags != EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT
-           || flags != EV_UREC|EV_KEEP|EV_ABRT || flags != EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT
-            || flags != EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT 
-              || flags != EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT) {
+  if (flags != EV_UREC || flags != (EV_UREC|EV_UMUT) || flags != (EV_UREC|EV_UMUT|EV_AMUT)
+       || flags != (EV_UREC|EV_KEEP) || flags != (EV_UREC|EV_UMUT|EV_KEEP)
+        || flags != (EV_UMUT|EV_AMUT|EV_KEEP) || flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)
+         || flags != (EV_UREC|EV_ABRT) || flags != (EV_UREC|EV_UMUT|EV_ABRT)
+          || flags != (EV_UMUT|EV_AMUT|EV_ABRT) || flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)
+           || flags != (EV_UREC|EV_KEEP|EV_ABRT) || flags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)
+            || flags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)
+              || flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)) {
 
     return NULL;
   }
 
   // valid other opts
-  if (population_size <= 0 || generations_limit <= 0 || mutation_propability < 0.0 
+  if (population_size <= 0 || generation_limit <= 0 || mutation_propability < 0.0 
         || mutation_propability > 1.0 || death_percentage < 0.0 || death_percentage > 1.0)
     return NULL;
   
@@ -146,7 +146,7 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   ev->recombinate           = recombinate;
   ev->continue_ev           = continue_ev;
   ev->population_size       = population_size;
-  ev->generations_limit     = generations_limit;
+  ev->generation_limit     = generation_limit;
   ev->mutation_propability  = mutation_propability;
   ev->death_percentage      = death_percentage;
   ev->use_recmbination      = flags & EV_USE_RECOMBINATION;
@@ -156,7 +156,7 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   ev->use_abort_requirement = flags & EV_USE_ABORT_REQUIREMENT;
 
   // multiplicator if we should discard the last generation, we can't recombinate in place
-  mul = ev->keep_last_generation ? 1 : 2;
+  int mul = ev->keep_last_generation ? 1 : 2;
 
   ev->population  = (Individual **) malloc(sizeof(Individual *) * population_size * mul);
   ev->individuals = (Individual *) malloc(sizeof(Individual) * population_size * mul);
@@ -190,9 +190,9 @@ Individual *evolute(Evolution *ev) {
    * each loop lets one generation grow kills the worst individuals
    * and let new individuals born
    */
-  int i, j, rand1, rand2, start;
-  for (i = 0; i < ev->generations_limit && (!ev->use_abort_requirement
-                || (ev->use_abort_requirement && ev->abort_requirement(ev->individuals))); i++) {
+  int i, j, rand1, rand2, start, end;
+  for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
+                || (ev->use_abort_requirement && ev->continue_ev(ev->individuals))); i++) {
 
     // calculates the fitness for each Individual
     for (j = 0; j < ev->population_size; j++)
@@ -208,7 +208,7 @@ Individual *evolute(Evolution *ev) {
      * If we keep the last generation, we can recombinate in place
      * else wen wirst calculate an new populion
      */
-    start = ev->keep_last_generation ? survive : ev->population_size;
+    start = ev->keep_last_generation ? survives : ev->population_size;
     end   = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
 
 
@@ -220,7 +220,7 @@ Individual *evolute(Evolution *ev) {
         while (rand1 == rand2) rand2 = rand() % start;
         
         // recombinate individuals
-        ev->recombinate(ev-population[rand1], ev->population[rand2], ev->population[j]);
+        ev->recombinate(ev->population[rand1], ev->population[rand2], ev->population[j]);
         
         // mutate Individuals
         if (ev->use_muttation) {
@@ -239,7 +239,7 @@ Individual *evolute(Evolution *ev) {
       // if deaths == survives, make sure that all survivers are being copyed and mutated
       if (start * 2 == end) {
         for (j = 0; j < start; j++) {
-          ev->clone_individual(ev->population[j + start]->individual, population[j]->individual);
+          ev->clone_individual(ev->population[j + start]->individual, ev->population[j]->individual);
           ev->mutate(ev->population[j + start]);
         }
 
@@ -247,7 +247,7 @@ Individual *evolute(Evolution *ev) {
       } else {
         for (j = start; j < end; j ++) {
           rand1 = rand() % start;
-          ev->clone_individual(ev->population[j]->individual, population[rand1]->individual);
+          ev->clone_individual(ev->population[j]->individual, ev->population[rand1]->individual);
           ev->mutate(ev->population[j]);
         }
       }
@@ -297,15 +297,15 @@ void evolution_clean_up(Evolution *ev) {
  * Computes an evolution for the given params
  * and returns the best Individual
  */
-Individual *best_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
+Individual best_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
                           void (*free_individual) (void *), void (*mutate) (Individual *),
                             int (*fitness) (Individual *), void (*recombinate) (Individual *,
                               Individual *, Individual *), char (*continue_ev) (Individual *),
-                                int population_size, int generations_limit, double mutation_propability,
+                                int population_size, int generation_limit, double mutation_propability,
                                   double death_percentage, char flags) {
 
   Evolution *ev = new_evolution(init_individual, clone_individual, free_individual, mutate,
-                            fitness, recombinate, continue_ev, population_size, generations_limit, 
+                            fitness, recombinate, continue_ev, population_size, generation_limit, 
                               mutation_propability, death_percentage, flags);
 
   Individual best = *evolute(ev);
@@ -313,5 +313,7 @@ Individual *best_evolution(void *(*init_individual) (), void (*clone_individual)
 
   return best;
 }
+
+int main() { return 0; }
 
 #endif // end of EVOLUTION

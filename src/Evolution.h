@@ -15,16 +15,6 @@
 #define EVOLUTION_MUTATE_ACCURACY 10000
 
 /**
- * Macros for Sorting the Population by Fitness
- */
-#define CHIEFSORT_TYPE MazeIndividual *
-#define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
-#define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
-#define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
-#define EV_MIN_QUICKSORT 20
-#include "sort.c"
-
-/**
  * Flags for the new_evolution function
  */
 #define EV_USE_RECOMBINATION      1
@@ -56,6 +46,16 @@ typedef struct {
   void *individual;         /* void pointer to the Individual */
   long fitness;             /* the fitness of this Individual */
 } Individual;
+
+/**
+ * Macros for Sorting the Population by Fitness
+ */
+#define CHIEFSORT_TYPE Individual *
+#define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
+#define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
+#define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
+#define EV_MIN_QUICKSORT 20
+#include "sort.c"
 
 /**
  * Structur holding the Individual Population.
@@ -91,9 +91,9 @@ struct Evolution {
   char keep_last_generation;                /* indicates wheter to disgard last generation or not */
   double mutation_propability;              /* the probability of an Individual to mutate */
   double death_percentage;                  /* the percent of Individual that die during an generation change */
-  char (*continue_ev) (Individual *)        /* abort requirement function should return 0 to abort 1 to continue */
-  char use_abort_requirement                /* if not true calculation will go on until generation limit es reatched */
-  int generation_limit                      /* maximum of generations to calculate (even if abort requirement is used) */
+  char (*continue_ev) (Individual *);       /* abort requirement function should return 0 to abort 1 to continue */
+  char use_abort_requirement;               /* if not true calculation will go on until generation limit es reatched */
+  int generation_limit;                     /* maximum of generations to calculate (even if abort requirement is used) */
 };
 
 // functions
@@ -105,7 +105,7 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
                                   double death_percentage, char flags);
 Individual *evolute(Evolution *ev);
 void evolution_clean_up(Evolution *ev);
-Individual *best_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
+Individual best_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
                           void (*free_individual) (void *), void (*mutate) (Individual *),
                             int (*fitness) (Individual *), void (*recombinate) (Individual *,
                               Individual *, Individual *), char (*continue_ev) (Individual *),
