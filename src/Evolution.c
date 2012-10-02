@@ -176,7 +176,15 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
     ev->population[i] = ev->individuals + i;
     ev->individuals[i].individual = init_individual();
     ev->individuals[i].fitness    = 0;
+
+    #ifdef EVOLUTION_VERBOSE
+    printf("init population: %10d\r", population_size * mul - i);
+    #endif
   }
+
+  #ifdef EVOLUTION_EXTRA_VERBOSE
+  printf("Population Initialized\n");
+  #endif
 
   return ev;
 }
@@ -205,8 +213,13 @@ Individual *evolute(Evolution *ev) {
                 || (ev->use_abort_requirement && ev->continue_ev(ev->individuals))); i++) {
 
     // calculates the fitness for each Individual
-    for (j = 0; j < ev->population_size; j++)
+    for (j = 0; j < ev->population_size; j++) {
       ev->population[j]->fitness = ev->fitness(ev->population[j]);
+
+      #ifdef EVOLUTION_VERBOSE
+      printf("Evolution: generation left %10d tasks fittnes %10d\r", ev->generation_limit - i, ev->population_size - j);
+      #endif
+    }
   
     /**
      * Select the best individuals to survive,
@@ -227,7 +240,7 @@ Individual *evolute(Evolution *ev) {
 
         // from 2 Individuals of the untouched part we calculate an new one
         rand2 = rand1 = rand() % start;
-        while (rand1 == rand2) rand2 = rand() % start;
+        while (rand1 == rand2) rand2 = rand() % start; // TODO prevent endless loop if one one idividual survives
         
         // recombinate individuals
         ev->recombinate(ev->population[rand1], ev->population[rand2], ev->population[j]);
@@ -242,6 +255,10 @@ Individual *evolute(Evolution *ev) {
               ev->mutate(ev->population[j]);
           }
         }
+
+        #ifdef EVOLUTION_VERBOSE
+        printf("Evolution: generation left %10d tasks recombination %10d\r", ev->generation_limit - i, end - j);
+        #endif
       }
     // copy and mutate individuals
     } else {
@@ -251,6 +268,10 @@ Individual *evolute(Evolution *ev) {
         for (j = 0; j < start; j++) {
           ev->clone_individual(ev->population[j + start]->individual, ev->population[j]->individual);
           ev->mutate(ev->population[j + start]);
+
+          #ifdef EVOLUTION_VERBOSE
+          printf("Evolution: generation left %10d tasks mutation %10d\r", ev->generation_limit - i, start - j);
+          #endif
         }
 
       // else choose random survivers to mutate
@@ -259,6 +280,10 @@ Individual *evolute(Evolution *ev) {
           rand1 = rand() % start;
           ev->clone_individual(ev->population[j]->individual, ev->population[rand1]->individual);
           ev->mutate(ev->population[j]);
+
+          #ifdef EVOLUTION_VERBOSE
+          printf("Evolution: generation left %10d tasks mutation %10d\r", ev->generation_limit - i, end - j);
+          #endif
         }
       }
     }
@@ -280,11 +305,20 @@ Individual *evolute(Evolution *ev) {
 
 
   // calculates the fitness for each Individual of the last Generation
-  for (j = 0; j < ev->population_size; j++)
+  for (j = 0; j < ev->population_size; j++) {
     ev->fitness(ev->population[j]);
+
+    #ifdef EVOLUTION_VERBOSE
+    printf("Evolution: generation left %10d tasks fittnes %10d\r", 0, ev->population_size - j);
+    #endif
+  }
   
   // Sort the Individuals by their fittnes
   EVOLUTION_SELECTION(ev)
+
+  #ifdef EVOLUTION_VERBOSE
+  printf("                                                                                           \r");
+  #endif
 
   // return the best
   return ev->population[0];
@@ -294,7 +328,7 @@ Individual *evolute(Evolution *ev) {
  * Frees unneded resauces after an evolution calculation
  */
 void evolution_clean_up(Evolution *ev) {
-  int end   = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
+  int end = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
   int i;
   for (i = 1; i < end; i++) {
     ev->free_individual(ev->population[i]->individual);
