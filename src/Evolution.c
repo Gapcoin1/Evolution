@@ -19,18 +19,18 @@
  * | void free_individual(void *src)              | takes an void pointer to individual and should free  |
  * |                                              | the spaces allocated by the given individual         |
  * |                                              |                                                      |
- * | void mutate(void *src)                       | takes an void pointer to an individual and should    |
+ * | void mutate(Individual *src)                 | takes an void pointer to an individual and should    |
  * |                                              | change it in a way that the probability to           |
  * |                                              | improove it is around 1/5                            |
  * |                                              |                                                      |
- * | int fitness(void *src)                       | takes an void pointer to an individual, and should   |
+ * | int fitness(Individual *src)                 | takes an void pointer to an individual, and should   |
  * |                                              | return an integer value that indicates how strong    |
  * |                                              | (good / improoved / near by an optimal solution) it  |
  * |                                              | is, as higher as better                              |
  * |                                              |                                                      |
- * | void recombinate(void *src1, void *src2,     | takes three void pointer to individuals and should   |
- * |                                   void *dst) | combinate the first two one, and should save the     |
- * |                                              | result in the thired one. As mutate the probability  |
+ * | void recombinate(Individual *src1,           | takes three void pointer to individuals and should   |
+ * |                   Individual *src2,          | combinate the first two one, and should save the     |
+ * |                    Individual *dst)          | result in the thired one. As mutate the probability  |
  * |                                              | to get an improoved individuals should be around 1/5 |
  * |                                              |                                                      |
  * | char continue_ev(Individual *ivs)            | takes an pointer to the current Individuals and      |
