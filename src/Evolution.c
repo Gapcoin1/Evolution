@@ -207,9 +207,12 @@ Individual *evolute(Evolution *ev) {
   int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
   int survives = ev->population_size - deaths;
   int mutate   = (int) ((double) EVOLUTION_MUTATE_ACCURACY * ev->mutation_propability);
-  int improovs, last_improovs; 
+  int improovs; 
   Individual *tmp_iv;
-  last_improovs = improovs = 0;
+  improovs = 0;
+  #ifdef EVOLUTION_EXTRA_VERBOSE
+  char last_improovs[25];
+  #endif
 
   /**
    * Generation loop
@@ -220,11 +223,6 @@ Individual *evolute(Evolution *ev) {
   for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
                 || (ev->use_abort_requirement && ev->continue_ev(ev->individuals))); i++) {
     
-    #ifdef EVOLUTION_EXTRA_VERBOSE
-    printf ("improovs: %10d -> %3.5f%% best fitness: %10d                                                         \n", improovs, (improovs / (double) deaths) * 100.0, ev->population[0]->fitness);
-    #endif
-
-    last_improovs = improovs;
     improovs = 0;
   
     /**
@@ -268,7 +266,7 @@ Individual *evolute(Evolution *ev) {
 
 
         #ifdef EVOLUTION_VERBOSE
-        printf("Evolution: generation left %10d tasks recombination %10d improovs %3.5f%%\r", ev->generation_limit - i, end - j, (last_improovs / (double) deaths) * 100);
+        printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", ev->generation_limit - i, end - j, last_improovs);
         #endif
       }
     // copy and mutate individuals
@@ -291,7 +289,7 @@ Individual *evolute(Evolution *ev) {
          
          
           #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation %10d improovs %3.5f%%\r", ev->generation_limit - i, start - j, (last_improovs / (double) deaths) * 100);
+          printf("Evolution: generation left %10d tasks mutation %10d improovs %9s%%\r", ev->generation_limit - i, start - j, last_improovs);
           #endif
         }
 
@@ -313,7 +311,7 @@ Individual *evolute(Evolution *ev) {
          
          
           #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation %10d improovs %3.5f%%\r", ev->generation_limit - i, end - j, (last_improovs / (double) deaths) * 100);
+          printf("Evolution: generation left %10d tasks mutation %10d improovs %9s%%\r", ev->generation_limit - i, end - j, last_improovs);
           #endif
         }
       }
@@ -339,6 +337,11 @@ Individual *evolute(Evolution *ev) {
      */
     EVOLUTION_SELECTION(ev)
 
+    #ifdef EVOLUTION_EXTRA_VERBOSE
+    sprintf(last_improovs,"%.5f", (improovs / (double) deaths) * 100.0);
+    printf("improovs: %10d -> %9s%%      best fitness: %10li                                                         \n", 
+              improovs, last_improovs, ev->population[0]->fitness);
+    #endif
   }
 
 
