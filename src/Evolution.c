@@ -175,12 +175,18 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   for (i = 0; i < population_size * mul; i++) {
     ev->population[i] = ev->individuals + i;
     ev->individuals[i].individual = init_individual();
-    ev->individuals[i].fitness    = 0;
+    ev->population[i]->fitness = ev->fitness(ev->population[i]);
 
     #ifdef EVOLUTION_VERBOSE
     printf("init population: %10d\r", population_size * mul - i);
     #endif
   }
+
+  /**
+   * Select the best individuals to survive,
+   * Sort the Individuals by their fittnes
+   */
+  EVOLUTION_SELECTION(ev)
 
   #ifdef EVOLUTION_EXTRA_VERBOSE
   printf("Population Initialized\n");
@@ -201,6 +207,7 @@ Individual *evolute(Evolution *ev) {
   int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
   int survives = ev->population_size - deaths;
   int mutate   = (int) ((double) EVOLUTION_MUTATE_ACCURACY * ev->mutation_propability);
+  double improovs; 
   Individual *tmp_iv;
 
   /**
@@ -212,21 +219,8 @@ Individual *evolute(Evolution *ev) {
   for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
                 || (ev->use_abort_requirement && ev->continue_ev(ev->individuals))); i++) {
 
-    // calculates the fitness for each Individual
-    for (j = 0; j < ev->population_size; j++) {
-      ev->population[j]->fitness = ev->fitness(ev->population[j]);
-
-      #ifdef EVOLUTION_VERBOSE
-      printf("Evolution: generation left %10d tasks fittnes %10d\r", ev->generation_limit - i, ev->population_size - j);
-      #endif
-    }
+    improovs = 0.0;
   
-    /**
-     * Select the best individuals to survive,
-     * Sort the Individuals by theur fittnes
-     */
-    EVOLUTION_SELECTION(ev)
-
     /**
      * If we keep the last generation, we can recombinate in place
      * else wen wirst calculate an new populion
@@ -256,8 +250,19 @@ Individual *evolute(Evolution *ev) {
           }
         }
 
+        // calculate the fittnes for the new individual
+        ev->population[j]->fitness = ev->fitness(ev->population[j]);
+
+        /**
+         * store if the new individual is better as the old one
+         */
+        if (ev->population[j]->fitness < ev->population[rand1]->fitness
+             && ev->population[j]->fitness < ev->population[rand2]->fitness) // TODO use min max serarch HERE!!!
+          improovs++;
+
+
         #ifdef EVOLUTION_VERBOSE
-        printf("Evolution: generation left %10d tasks recombination %10d\r", ev->generation_limit - i, end - j);
+        printf("Evolution: generation left %10d tasks recombination %10d improoves %3.5f%%\r", ev->generation_limit - i, end - j, (improoves / (double) deaths) * 100);
         #endif
       }
     // copy and mutate individuals
@@ -269,8 +274,18 @@ Individual *evolute(Evolution *ev) {
           ev->clone_individual(ev->population[j + start]->individual, ev->population[j]->individual);
           ev->mutate(ev->population[j + start]);
 
+          // calculate the fittnes for the new individual
+          ev->population[j]->fitness = ev->fitness(ev->population[j]);
+         
+          /**
+           * store if the new individual is better as the old one
+           */
+          if (ev->population[j + start]->fitness < ev->population[j]->fitness) // TODO use min max serach HERE!!!
+            improovs++;
+         
+         
           #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation %10d\r", ev->generation_limit - i, start - j);
+          printf("Evolution: generation left %10d tasks mutation %10d improoves %3.5f%%\r", ev->generation_limit - i, start - j, (improoves / (double) deaths) * 100);
           #endif
         }
 
@@ -281,8 +296,18 @@ Individual *evolute(Evolution *ev) {
           ev->clone_individual(ev->population[j]->individual, ev->population[rand1]->individual);
           ev->mutate(ev->population[j]);
 
+          // calculate the fittnes for the new individual
+          ev->population[j]->fitness = ev->fitness(ev->population[j]);
+         
+          /**
+           * store if the new individual is better as the old one
+           */
+          if (ev->population[j]->fitness < ev->population[rand1]->fitness) // TODO use min max serach HERE!!!
+            improovs++;
+         
+         
           #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation %10d\r", ev->generation_limit - i, end - j);
+          printf("Evolution: generation left %10d tasks mutation %10d improoves %3.5f%%\r", ev->generation_limit - i, end - j, (improoves / (double) deaths) * 100);
           #endif
         }
       }
@@ -301,6 +326,13 @@ Individual *evolute(Evolution *ev) {
         ev->population[ev->population_size + j] = tmp_iv;
       }
     }
+
+    /**
+     * Select the best individuals to survive,
+     * Sort the Individuals by theur fittnes
+     */
+    EVOLUTION_SELECTION(ev)
+
   }
 
 
