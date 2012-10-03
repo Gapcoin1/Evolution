@@ -219,6 +219,10 @@ Individual *evolute(Evolution *ev) {
   int i, j, rand1, rand2, start, end;
   for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
                 || (ev->use_abort_requirement && ev->continue_ev(ev->individuals))); i++) {
+    
+    #ifdef EVOLUTION_EXTRA_VERBOSE
+    printf ("improovs: %10d -> %3.5f%% best fitness: %10d                                                         \n", improovs, (improovs / (double) deaths) * 100.0, ev->population[0]->fitness);
+    #endif
 
     last_improovs = improovs;
     improovs = 0;
