@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 
   Evolution *ev = new_evolution(init_v, clone_v, free_v, mutate_v, fittnes_v,
                           recombinate_v, NULL, TEST_NUM_IVS, atoi(argv[1]), 1.0, 0.5,
-                             EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP);
+                             EV_UMUT|EV_AMUT|EV_KEEP);
   best = evolute(ev);
 
   Vektor *v = (Vektor *) best->individual;

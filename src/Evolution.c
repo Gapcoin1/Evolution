@@ -279,7 +279,7 @@ Individual *evolute(Evolution *ev) {
           ev->mutate(ev->population[j + start]);
 
           // calculate the fittnes for the new individual
-          ev->population[j]->fitness = ev->fitness(ev->population[j]);
+          ev->population[j + start]->fitness = ev->fitness(ev->population[j + start]);
          
           /**
            * store if the new individual is better as the old one
@@ -289,7 +289,7 @@ Individual *evolute(Evolution *ev) {
          
          
           #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation %10d improovs %9s%%\r", ev->generation_limit - i, start - j, last_improovs);
+          printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", ev->generation_limit - i, start - j, last_improovs);
           #endif
         }
 
@@ -311,7 +311,7 @@ Individual *evolute(Evolution *ev) {
          
          
           #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation %10d improovs %9s%%\r", ev->generation_limit - i, end - j, last_improovs);
+          printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", ev->generation_limit - i, end - j, last_improovs);
           #endif
         }
       }
