@@ -120,15 +120,16 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
                                 int population_size, int generation_limit, double mutation_propability,
                                   double death_percentage, char flags) {
 
+  int tflags = flags & ~EV_SMAX;
   // valid flag combination ?
-  if (flags != EV_UREC && flags != (EV_UREC|EV_UMUT) && flags != (EV_UREC|EV_UMUT|EV_AMUT)
-       && flags != (EV_UREC|EV_KEEP) && flags != (EV_UREC|EV_UMUT|EV_KEEP)
-        && flags != (EV_UMUT|EV_AMUT|EV_KEEP) && flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)
-         && flags != (EV_UREC|EV_ABRT) && flags != (EV_UREC|EV_UMUT|EV_ABRT)
-          && flags != (EV_UMUT|EV_AMUT|EV_ABRT) && flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)
-           && flags != (EV_UREC|EV_KEEP|EV_ABRT) && flags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)
-            && flags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)
-              && flags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)) {
+  if (tflags != EV_UREC && tflags != (EV_UREC|EV_UMUT) && tflags != (EV_UREC|EV_UMUT|EV_AMUT)
+       && tflags != (EV_UREC|EV_KEEP) && tflags != (EV_UREC|EV_UMUT|EV_KEEP)
+        && tflags != (EV_UMUT|EV_AMUT|EV_KEEP) && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)
+         && tflags != (EV_UREC|EV_ABRT) && tflags != (EV_UREC|EV_UMUT|EV_ABRT)
+          && tflags != (EV_UMUT|EV_AMUT|EV_ABRT) && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)
+           && tflags != (EV_UREC|EV_KEEP|EV_ABRT) && tflags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)
+            && tflags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)
+              && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)) {
     
     #ifdef DEBUG
       printf("[DEBUG] wrong flag combination\n");
@@ -161,7 +162,7 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   ev->recombinate           = recombinate;
   ev->continue_ev           = continue_ev;
   ev->population_size       = population_size;
-  ev->generation_limit     = generation_limit;
+  ev->generation_limit      = generation_limit;
   ev->mutation_propability  = mutation_propability;
   ev->death_percentage      = death_percentage;
   ev->use_recmbination      = flags & EV_USE_RECOMBINATION;
@@ -269,9 +270,16 @@ Individual *evolute(Evolution *ev) {
         /**
          * store if the new individual is better as the old one
          */
-        if (ev->population[j]->fitness < ev->population[rand1]->fitness
-             && ev->population[j]->fitness < ev->population[rand2]->fitness) // TODO use min max serarch HERE!!!
-          improovs++;
+        if (ev->sort_max) {
+          if (ev->population[j]->fitness > ev->population[rand1]->fitness
+               && ev->population[j]->fitness > ev->population[rand2]->fitness) 
+            improovs++;
+
+        } else {
+          if (ev->population[j]->fitness < ev->population[rand1]->fitness
+               && ev->population[j]->fitness < ev->population[rand2]->fitness)
+            improovs++;
+        }
 
 
         #ifdef EVOLUTION_VERBOSE
@@ -293,8 +301,14 @@ Individual *evolute(Evolution *ev) {
           /**
            * store if the new individual is better as the old one
            */
-          if (ev->population[j + start]->fitness < ev->population[j]->fitness) // TODO use min max serach HERE!!!
-            improovs++;
+          if (ev->sort_max) {
+            if (ev->population[j + start]->fitness > ev->population[j]->fitness) 
+              improovs++;
+
+          } else {
+            if (ev->population[j + start]->fitness < ev->population[j]->fitness) 
+              improovs++;
+          }
          
          
           #ifdef EVOLUTION_VERBOSE
@@ -315,8 +329,14 @@ Individual *evolute(Evolution *ev) {
           /**
            * store if the new individual is better as the old one
            */
-          if (ev->population[j]->fitness < ev->population[rand1]->fitness) // TODO use min max serach HERE!!!
-            improovs++;
+          if (ev->sort_max) {
+            if (ev->population[j]->fitness > ev->population[rand1]->fitness)
+              improovs++;
+
+          } else {
+            if (ev->population[j]->fitness < ev->population[rand1]->fitness)
+              improovs++;
+          }
          
          
           #ifdef EVOLUTION_VERBOSE

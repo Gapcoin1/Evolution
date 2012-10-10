@@ -20,7 +20,7 @@ void paralellsort(CHIEFSORT_TYPE *ary, int length, int min_insertionsort, int th
  
     paralellchiefsort((void *) &para);
   } else
-    chiefsort(ary, length, min_insertionsort);
+    chiefsort_min(ary, length, min_insertionsort);
 }
 
 /**
@@ -270,7 +270,7 @@ void *paralellchiefsort(void *arg) {
 
 
   if (right - left < min) {
-    insertionsort(para->ary + left, (right - left) + 1);
+    insertionsort_min(para->ary + left, (right - left) + 1);
     return NULL;
   }
 
@@ -378,7 +378,7 @@ void *serialchiefsort(void *arg) {
   while (1) {
 
     if (right - left < min) {
-      insertionsort(para->ary + left, (right - left) + 1);
+      insertionsort_min(para->ary + left, (right - left) + 1);
       left = right;
     }
 
