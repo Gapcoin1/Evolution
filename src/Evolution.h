@@ -22,6 +22,8 @@
 #define EV_ALWAYS_MUTATE          4
 #define EV_KEEP_LAST_GENERATION   8
 #define EV_USE_ABORT_REQUIREMENT  16
+#define EV_SORT_MAX               32
+#define EV_SORT_MIN               0
 
 /**
  * Shorter Flags
@@ -31,6 +33,8 @@
 #define EV_AMUT EV_ALWAYS_MUTATE
 #define EV_KEEP EV_KEEP_LAST_GENERATION
 #define EV_ABRT EV_USE_ABORT_REQUIREMENT
+#define EV_SMIN EV_SORT_MIN
+#define EV_SMAX EV_SORT_MAX
 
 /**
  * An Individual wich has an definied fitness
@@ -53,9 +57,17 @@ typedef struct {
 
 /**
  * Sorts the best Individual at top of the population array
+ * smal fitness best
  */
-#define EVOLUTION_SELECTION(EVOLUTION) \
-  chiefsort(EVOLUTION->population, EVOLUTION->population_size, EV_MIN_QUICKSORT);
+#define EVOLUTION_SELECTION_MIN(EVOLUTION) \
+  chiefsort_min(EVOLUTION->population, EVOLUTION->population_size, EV_MIN_QUICKSORT);
+
+/**
+ * Sorts the best Individual at top of the population array
+ * biggest fitness best
+ */
+#define EVOLUTION_SELECTION_MAX(EVOLUTION) \
+  chiefsort_max(EVOLUTION->population, EVOLUTION->population_size, EV_MIN_QUICKSORT);
 
 /**
  * Structur holding the Individual Population.
@@ -94,6 +106,7 @@ struct Evolution {
   char (*continue_ev) (Individual *);       /* abort requirement function should return 0 to abort 1 to continue */
   char use_abort_requirement;               /* if not true calculation will go on until generation limit es reatched */
   int generation_limit;                     /* maximum of generations to calculate (even if abort requirement is used) */
+  char sort_max;                            /* if the individuals should be sorted by max or min fittnes */
 };
 
 // functions

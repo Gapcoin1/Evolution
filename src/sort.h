@@ -43,7 +43,9 @@ typedef struct {
 // functions
 void *serialchiefsort(void *arg);
 void *paralellchiefsort(void *arg);
-void chiefsort(CHIEFSORT_TYPE *ary, int length, int min);
-void insertionsort(CHIEFSORT_TYPE *ary, int length);
+void chiefsort_min(CHIEFSORT_TYPE *ary, int length, int min);
+void chiefsort_max(CHIEFSORT_TYPE *ary, int length, int min);
+void insertionsort_min(CHIEFSORT_TYPE *ary, int length);
+void insertionsort_max(CHIEFSORT_TYPE *ary, int length);
 void quicksort(CHIEFSORT_TYPE *ary, int length);
 void paralellsort(CHIEFSORT_TYPE *ary, int length, int min_insertionsort, int threads);

@@ -80,9 +80,9 @@ void quicksort(CHIEFSORT_TYPE *ary, int length) {
 }
 
 /**
- * Just Insertionsort
+ * Just Insertionsort Min first
  */
-void insertionsort(CHIEFSORT_TYPE *ary, int length) {
+void insertionsort_min(CHIEFSORT_TYPE *ary, int length) {
   
   int i, j;
   CHIEFSORT_TYPE temp;
@@ -102,9 +102,32 @@ void insertionsort(CHIEFSORT_TYPE *ary, int length) {
 }
 
 /**
- * Improofed variant of QuickSort which uses insertionsort at an specific min array size
+ * Just Insertionsort Max first
  */
-void chiefsort(CHIEFSORT_TYPE *ary, int length, int min) {
+void insertionsort_max(CHIEFSORT_TYPE *ary, int length) {
+  
+  int i, j;
+  CHIEFSORT_TYPE temp;
+
+  for (i = 1; i < length; i++) {
+    temp = ary[i];
+    j = i - 1;
+
+    while (j >= 0 && CHIEFSORT_BIGGER(temp, ary[j])) {
+      ary[j + 1] = ary[j];
+      j = j - 1;
+    }   
+    
+    ary[j + 1] = temp;
+  }
+
+}
+
+/**
+ * Improofed variant of QuickSort which uses insertionsort at an specific min array size
+ * Sorts the min at start
+ */
+void chiefsort_min(CHIEFSORT_TYPE *ary, int length, int min) {
 
   CHIEFSORT_TYPE piv;
   CHIEFSORT_TYPE temp;
@@ -118,7 +141,7 @@ void chiefsort(CHIEFSORT_TYPE *ary, int length, int min) {
   while (1) {
 
     if (right - left < min) {
-      insertionsort(ary + left, (right - left) + 1);
+      insertionsort_min(ary + left, (right - left) + 1);
       left = right;
     }
 
@@ -161,6 +184,69 @@ void chiefsort(CHIEFSORT_TYPE *ary, int length, int min) {
   }
 
 }
+
+/**
+ * Improofed variant of QuickSort which uses insertionsort at an specific min array size
+ * Sorts the max at start
+ */
+void chiefsort_max(CHIEFSORT_TYPE *ary, int length, int min) {
+
+  CHIEFSORT_TYPE piv;
+  CHIEFSORT_TYPE temp;
+  IntAry stack;
+  int l, r, left, right;
+  ARY_INIT(int, stack, (int) 5 * (log2((double) length) / 3)); 
+
+  left  = 0;
+  right = length - 1;
+
+  while (1) {
+
+    if (right - left < min) {
+      insertionsort_max(ary + left, (right - left) + 1);
+      left = right;
+    }
+
+    if (left < right) {
+
+      l = left;
+      r = right;
+      piv = ary[(rand() % (r - l)) + l];
+
+      while (l < r) {
+        
+        while (CHIEFSORT_SMALER(ary[r], piv))
+          r--; 
+
+        while (CHIEFSORT_BIGGER(ary[l], piv)) 
+          l++; 
+
+        if (CHIEFSORT_EQL(ary[l], ary[r])) {
+          r--;
+
+        // switch left an right
+        } else if (l < r) {
+          temp = ary[l];
+          ary[l] = ary[r];
+          ary[r] = temp;
+        }
+
+      }
+
+      ARY_PUSH(int, stack, right)  // statt push neuer thread mit qicksort von ary + right + 1
+      right = (left > l - 1) ? left : l - 1;
+
+    } else {
+      if (stack.length > 0) {
+        left = right + 1;
+        ARY_PULL(stack, right)
+      } else break;
+    }
+
+  }
+
+}
+
 
 
 /**

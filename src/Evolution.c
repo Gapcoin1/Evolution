@@ -26,7 +26,7 @@
  * | int fitness(Individual *src)                 | takes an void pointer to an individual, and should   |
  * |                                              | return an integer value that indicates how strong    |
  * |                                              | (good / improoved / near by an optimal solution) it  |
- * |                                              | is, as higher as better                              |
+ * |                                              | is. Control the sorting order with the sort flags    |
  * |                                              |                                                      |
  * | void recombinate(Individual *src1,           | takes three void pointer to individuals and should   |
  * |                   Individual *src2,          | combinate the first two one, and should save the     |
@@ -47,6 +47,8 @@
  *    EV_AMUT / EV_ALWAYS_MUTATE
  *    EV_KEEP / EV_KEEP_LAST_GENERATION
  *    EV_ABRT / EV_USE_ABORT_REQUIREMENT
+ *    EV_SMAX / EV_SORT_MAX
+ *    EV_SMIN / EV_SORT_MIN
  *
  * The floowing flag combinations are possible:
  *
@@ -107,6 +109,9 @@
  * | EV_UREC                                   | Recombinate Individual onley disgard old generation and |
  * |                                           | calc until generation limit is reatched                 |
  * +-------------------------------------------+---------------------------------------------------------+
+ *
+ * to all of the above combination an EV_SMIN / EV_SMAX can be added
+ * standart is EV_SMIN
  */
 Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
                           void (*free_individual) (void *), void (*mutate) (Individual *),
@@ -164,6 +169,7 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   ev->always_mutate         = flags & EV_ALWAYS_MUTATE;
   ev->keep_last_generation  = flags & EV_KEEP_LAST_GENERATION;
   ev->use_abort_requirement = flags & EV_USE_ABORT_REQUIREMENT;
+  ev->sort_max              = flags & EV_SORT_MAX;
 
   // multiplicator if we should discard the last generation, we can't recombinate in place
   int mul = ev->keep_last_generation ? 1 : 2;
@@ -186,7 +192,10 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
    * Select the best individuals to survive,
    * Sort the Individuals by their fittnes
    */
-  EVOLUTION_SELECTION(ev)
+  if (ev->sort_max)
+    EVOLUTION_SELECTION_MAX(ev)
+  else
+    EVOLUTION_SELECTION_MIN(ev)
 
   #ifdef EVOLUTION_EXTRA_VERBOSE
   printf("Population Initialized\n");
@@ -335,7 +344,10 @@ Individual *evolute(Evolution *ev) {
      * Select the best individuals to survive,
      * Sort the Individuals by theur fittnes
      */
-    EVOLUTION_SELECTION(ev)
+    if (ev->sort_max)
+      EVOLUTION_SELECTION_MAX(ev)
+    else
+      EVOLUTION_SELECTION_MIN(ev)
 
     #ifdef EVOLUTION_EXTRA_VERBOSE
     sprintf(last_improovs,"%.5f", (improovs / (double) deaths) * 100.0);
@@ -343,19 +355,6 @@ Individual *evolute(Evolution *ev) {
               improovs, last_improovs, ev->population[0]->fitness);
     #endif
   }
-
-
-  // calculates the fitness for each Individual of the last Generation
-  for (j = 0; j < ev->population_size; j++) {
-    ev->fitness(ev->population[j]);
-
-    #ifdef EVOLUTION_VERBOSE
-    printf("Evolution: generation left %10d tasks fittnes %10d\r", 0, ev->population_size - j);
-    #endif
-  }
-  
-  // Sort the Individuals by their fittnes
-  EVOLUTION_SELECTION(ev)
 
   #ifdef EVOLUTION_VERBOSE
   printf("                                                                                           \r");
