@@ -83,47 +83,54 @@ typedef struct {
  * (void pointer individual of Individual struct)
  *
  * the new born individuals are 1 - death_percentage, what means the Population keeps their size
+ *
+ * NOTE each function get an additional void pointer to with is used for specific args
  */
 typedef struct Evolution Evolution;
 struct Evolution {
-  void *(*init_individual) ();              /* function to initialzes an Individual */
+  void *(*init_individual) (void *);        /* function to initialzes an Individual */
   void (*clone_individual) (void *,         /* function clones an individual */
-                             void *);       /* first Individual is destination second is source */
-  void (*free_individual) (void *);         /* function to free (kill) an Individual */
+                             void *,
+                              void *);      /* first Individual is destination second is source */
+  void (*free_individual) (void *, 
+                            void *);        /* function to free (kill) an Individual */
   Individual **population;                  /* Population of Individuals only pointers for faster sorting */
   Individual *individuals;                  /* The Individuals */
   int population_size;                      /* Population size */
   void (*recombinate) (Individual *,        
-           Individual *, Individual *);     /* recombination function(src1, src2, dst) */
-  void (*mutate) (Individual *);            /* mutation function */
-  int (*fitness) (Individual *);            /* fittnes function */
+           Individual *, Individual *,
+             void *);                       /* recombination function(src1, src2, dst) */
+  void (*mutate) (Individual *, void *);    /* mutation function */
+  int (*fitness) (Individual *, void *);    /* fittnes function */
   char use_recmbination;                    /* indicates wether to use recombination or not */
   char use_muttation;                       /* indicates wether to use mutation or not */
   char always_mutate;                       /* indicates wheter to always mutate or use probability */
   char keep_last_generation;                /* indicates wheter to disgard last generation or not */
   double mutation_propability;              /* the probability of an Individual to mutate */
   double death_percentage;                  /* the percent of Individual that die during an generation change */
-  char (*continue_ev) (Individual *);       /* abort requirement function should return 0 to abort 1 to continue */
+  char (*continue_ev) (Individual *, 
+                        void *);            /* abort requirement function should return 0 to abort 1 to continue */
   char use_abort_requirement;               /* if not true calculation will go on until generation limit es reatched */
   int generation_limit;                     /* maximum of generations to calculate (even if abort requirement is used) */
   char sort_max;                            /* if the individuals should be sorted by max or min fittnes */
+  void *opts;                               /* pointer to aditional opts which is given to each function */
 };
 
 // functions
-Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
-                          void (*free_individual) (void *), void (*mutate) (Individual *),
-                            int (*fitness) (Individual *), void (*recombinate) (Individual *,
-                              Individual *, Individual *), char (*continue_ev) (Individual *),
+Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
+                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
-                                  double death_percentage, char flags);
+                                  double death_percentage, void *opts, char flags);
 Individual *evolute(Evolution *ev);
 void evolution_clean_up(Evolution *ev);
-Individual best_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
-                          void (*free_individual) (void *), void (*mutate) (Individual *),
-                            int (*fitness) (Individual *), void (*recombinate) (Individual *,
-                              Individual *, Individual *), char (*continue_ev) (Individual *),
+Individual best_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
+                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
-                                  double death_percentage, char flags);
+                                  double death_percentage, void *opts, char flags);
 
 
 #endif // end of EVOLUTION_HEADER

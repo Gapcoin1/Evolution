@@ -15,7 +15,7 @@ typedef struct {
   int a, b, c, d, e, f;
 } Vektor;
 
-void *init_v() {
+void *init_v(void *opts) {
   Vektor *v = (Vektor *) malloc(sizeof(Vektor));
   v->a = (rand() % 100) - 50;
   v->b = (rand() % 100) - 50;
@@ -26,7 +26,7 @@ void *init_v() {
   return v;
 }
 
-void clone_v(void *dst, void *src) {
+void clone_v(void *dst, void *src, void *opts) {
   Vektor *vd = (Vektor *) dst;
   Vektor *vs = (Vektor *) src;
 
@@ -38,11 +38,11 @@ void clone_v(void *dst, void *src) {
   vd->f = vs->f;
 }
 
-void free_v(void *dst) {
+void free_v(void *dst, void *opts) {
   free((Vektor *) dst);
 }
 
-void recombinate_v(Individual *src1, Individual *src2, Individual *dst) {
+void recombinate_v(Individual *src1, Individual *src2, Individual *dst, void *opts) {
   Vektor *vs1 = (Vektor *) src1->individual;
   Vektor *vs2 = (Vektor *) src2->individual;
   Vektor *vd  = (Vektor *) dst->individual;
@@ -55,7 +55,7 @@ void recombinate_v(Individual *src1, Individual *src2, Individual *dst) {
   vd->f = vs2->f;
 }
 
-void mutate_v(Individual *src) {
+void mutate_v(Individual *src, void *opts) {
   Vektor *v = (Vektor *) src->individual;
 
     v->a += (rand() % 3) - 1;
@@ -66,7 +66,7 @@ void mutate_v(Individual *src) {
     v->f += (rand() % 3) - 1;
 }
 
-int fittnes_v(Individual *src) {
+int fittnes_v(Individual *src, void *opts) {
   Vektor *v = (Vektor *) src->individual;
 
   return abs(v->a - v->b) + abs(v->b - v->c)
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
   Individual *best;
 
   Evolution *ev = new_evolution(init_v, clone_v, free_v, mutate_v, fittnes_v,
-                          recombinate_v, NULL, TEST_NUM_IVS, atoi(argv[1]), 1.0, 0.5,
+                          recombinate_v, NULL, TEST_NUM_IVS, atoi(argv[1]), 1.0, 0.5, NULL,
                              EV_UMUT|EV_AMUT|EV_KEEP);
   best = evolute(ev);
 

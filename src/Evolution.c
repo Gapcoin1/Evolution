@@ -6,35 +6,37 @@
  * Returns pointer to an new and initialzed Evolution
  * take pointers for varius functions:
  *
+ * opts can be used for aditional function wide values
+ *
  * +----------------------------------------------+------------------------------------------------------+
  * function pointer                               | describtion                                          |
  * +----------------------------------------------+------------------------------------------------------+
- * | void *init_individual()                      | should return an void pointer to an new initialized  |
+ * | void *init_individual(void *opts)            | should return an void pointer to an new initialized  |
  * |                                              | individual                                           |
  * |                                              |                                                      |
- * | void clone_individual(void *dst, void *src)  | takes two void pointer to individuals and should     |
- * |                                              | clone the content of the second one                  |
+ * | void clone_individual(void *dst, void *src,  | takes two void pointer to individuals and should     |
+ * |                        void *opts)           | clone the content of the second one                  |
  * |                                              | into the first one                                   |
  * |                                              |                                                      |
- * | void free_individual(void *src)              | takes an void pointer to individual and should free  |
+ * | void free_individual(void *src, void *opts)  | takes an void pointer to individual and should free  |
  * |                                              | the spaces allocated by the given individual         |
  * |                                              |                                                      |
- * | void mutate(Individual *src)                 | takes an void pointer to an individual and should    |
+ * | void mutate(Individual *src, void *opts)     | takes an void pointer to an individual and should    |
  * |                                              | change it in a way that the probability to           |
  * |                                              | improove it is around 1/5                            |
  * |                                              |                                                      |
- * | int fitness(Individual *src)                 | takes an void pointer to an individual, and should   |
+ * | int fitness(Individual *src, void *opts)     | takes an void pointer to an individual, and should   |
  * |                                              | return an integer value that indicates how strong    |
  * |                                              | (good / improoved / near by an optimal solution) it  |
  * |                                              | is. Control the sorting order with the sort flags    |
  * |                                              |                                                      |
  * | void recombinate(Individual *src1,           | takes three void pointer to individuals and should   |
  * |                   Individual *src2,          | combinate the first two one, and should save the     |
- * |                    Individual *dst)          | result in the thired one. As mutate the probability  |
- * |                                              | to get an improoved individuals should be around 1/5 |
+ * |                    Individual *dst,          | result in the thired one. As mutate the probability  |
+ * |                          void *opts)         | to get an improoved individuals should be around 1/5 |
  * |                                              |                                                      |
- * | char continue_ev(Individual *ivs)            | takes an pointer to the current Individuals and      |
- * |                                              | should return 0 if the calculaten should stop and    |
+ * | char continue_ev(Individual *ivs,            | takes an pointer to the current Individuals and      |
+ * |                           void *opts)        | should return 0 if the calculaten should stop and    |
  * |                                              | 1 if the calculaten should continue                  |
  * +----------------------------------------------+------------------------------------------------------+
  *
@@ -113,12 +115,12 @@
  * to all of the above combination an EV_SMIN / EV_SMAX can be added
  * standart is EV_SMIN
  */
-Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
-                          void (*free_individual) (void *), void (*mutate) (Individual *),
-                            int (*fitness) (Individual *), void (*recombinate) (Individual *,
-                              Individual *, Individual *), char (*continue_ev) (Individual *),
+Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
+                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generation_limit, double mutation_propability,
-                                  double death_percentage, char flags) {
+                                  double death_percentage, void *opts, char flags) {
 
   int tflags = flags & ~EV_SMAX;
   // valid flag combination ?
@@ -165,6 +167,7 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   ev->generation_limit      = generation_limit;
   ev->mutation_propability  = mutation_propability;
   ev->death_percentage      = death_percentage;
+  ev->opts                  = opts;
   ev->use_recmbination      = flags & EV_USE_RECOMBINATION;
   ev->use_muttation         = flags & EV_USE_MUTATION;
   ev->always_mutate         = flags & EV_ALWAYS_MUTATE;
@@ -181,8 +184,8 @@ Evolution *new_evolution(void *(*init_individual) (), void (*clone_individual) (
   int i;
   for (i = 0; i < population_size * mul; i++) {
     ev->population[i] = ev->individuals + i;
-    ev->individuals[i].individual = init_individual();
-    ev->population[i]->fitness = ev->fitness(ev->population[i]);
+    ev->individuals[i].individual = init_individual(ev->opts);
+    ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts);
 
     #ifdef EVOLUTION_VERBOSE
     printf("init population: %10d\r", population_size * mul - i);
@@ -231,7 +234,7 @@ Individual *evolute(Evolution *ev) {
    */
   int i, j, rand1, rand2, start, end;
   for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
-                || (ev->use_abort_requirement && ev->continue_ev(ev->individuals))); i++) {
+                || (ev->use_abort_requirement && ev->continue_ev(ev->individuals, ev->opts))); i++) {
     
     improovs = 0;
   
@@ -251,21 +254,21 @@ Individual *evolute(Evolution *ev) {
         while (rand1 == rand2) rand2 = rand() % start; // TODO prevent endless loop if one one idividual survives
         
         // recombinate individuals
-        ev->recombinate(ev->population[rand1], ev->population[rand2], ev->population[j]);
+        ev->recombinate(ev->population[rand1], ev->population[rand2], ev->population[j], ev->opts);
         
         // mutate Individuals
         if (ev->use_muttation) {
           if (ev->always_mutate)
-            ev->mutate(ev->population[j]);
+            ev->mutate(ev->population[j], ev->opts);
           else {
             rand1 = rand() % EVOLUTION_MUTATE_ACCURACY;
             if (rand1 <= mutate)
-              ev->mutate(ev->population[j]);
+              ev->mutate(ev->population[j], ev->opts);
           }
         }
 
         // calculate the fittnes for the new individual
-        ev->population[j]->fitness = ev->fitness(ev->population[j]);
+        ev->population[j]->fitness = ev->fitness(ev->population[j], ev->opts);
 
         /**
          * store if the new individual is better as the old one
@@ -283,7 +286,8 @@ Individual *evolute(Evolution *ev) {
 
 
         #ifdef EVOLUTION_VERBOSE
-        printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", ev->generation_limit - i, end - j, last_improovs);
+        printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", 
+                                            ev->generation_limit - i, end - j, last_improovs);
         #endif
       }
     // copy and mutate individuals
@@ -292,11 +296,11 @@ Individual *evolute(Evolution *ev) {
       // if deaths == survives, make sure that all survivers are being copyed and mutated
       if (start * 2 == end) {
         for (j = 0; j < start; j++) {
-          ev->clone_individual(ev->population[j + start]->individual, ev->population[j]->individual);
-          ev->mutate(ev->population[j + start]);
+          ev->clone_individual(ev->population[j + start]->individual, ev->population[j]->individual, ev->opts);
+          ev->mutate(ev->population[j + start], ev->opts);
 
           // calculate the fittnes for the new individual
-          ev->population[j + start]->fitness = ev->fitness(ev->population[j + start]);
+          ev->population[j + start]->fitness = ev->fitness(ev->population[j + start], ev->opts);
          
           /**
            * store if the new individual is better as the old one
@@ -312,7 +316,8 @@ Individual *evolute(Evolution *ev) {
          
          
           #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", ev->generation_limit - i, start - j, last_improovs);
+          printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
+                                            ev->generation_limit - i, start - j, last_improovs);
           #endif
         }
 
@@ -320,11 +325,11 @@ Individual *evolute(Evolution *ev) {
       } else {
         for (j = start; j < end; j ++) {
           rand1 = rand() % start;
-          ev->clone_individual(ev->population[j]->individual, ev->population[rand1]->individual);
-          ev->mutate(ev->population[j]);
+          ev->clone_individual(ev->population[j]->individual, ev->population[rand1]->individual, ev->opts);
+          ev->mutate(ev->population[j], ev->opts);
 
           // calculate the fittnes for the new individual
-          ev->population[j]->fitness = ev->fitness(ev->population[j]);
+          ev->population[j]->fitness = ev->fitness(ev->population[j], ev->opts);
          
           /**
            * store if the new individual is better as the old one
@@ -391,7 +396,7 @@ void evolution_clean_up(Evolution *ev) {
   int end = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
   int i;
   for (i = 1; i < end; i++) {
-    ev->free_individual(ev->population[i]->individual);
+    ev->free_individual(ev->population[i]->individual, ev->opts);
   }
   free(ev->individuals);
   free(ev->population);
@@ -401,16 +406,16 @@ void evolution_clean_up(Evolution *ev) {
  * Computes an evolution for the given params
  * and returns the best Individual
  */
-Individual best_evolution(void *(*init_individual) (), void (*clone_individual) (void *, void *),
-                          void (*free_individual) (void *), void (*mutate) (Individual *),
-                            int (*fitness) (Individual *), void (*recombinate) (Individual *,
-                              Individual *, Individual *), char (*continue_ev) (Individual *),
+Individual best_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
+                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generation_limit, double mutation_propability,
-                                  double death_percentage, char flags) {
+                                  double death_percentage, void *opts, char flags) {
 
   Evolution *ev = new_evolution(init_individual, clone_individual, free_individual, mutate,
                             fitness, recombinate, continue_ev, population_size, generation_limit, 
-                              mutation_propability, death_percentage, flags);
+                              mutation_propability, death_percentage, opts, flags);
 
   Individual best = *evolute(ev);
   evolution_clean_up(ev);
