@@ -7,6 +7,11 @@
 #define EVOLUTION_HEADER
 #include <pthread.h>
 
+// Evolution mutex
+#ifndef NO_MUTEX
+static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
 /**
  * structur for aditional information during evolution
  */
@@ -66,7 +71,7 @@ typedef struct {
 #define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
 #define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
 #define EV_MIN_QUICKSORT 20
-#include "sort.c"
+#include "sort.h"
 
 /**
  * Sorts the best Individual at top of the population array
@@ -147,8 +152,6 @@ struct Evolution {
 };
 
 
-// Evolution mutex
-static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // functions
 Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),

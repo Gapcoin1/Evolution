@@ -2,9 +2,14 @@
  * Simple implemenation of an Iterativ quick sort algorithm witch
  * fall back on a given min size to insertion sort
  */
+#ifndef CHIEFSORT_HEADER
+#define CHIEFSORT_HEADER
 #include <math.h>
 #include <pthread.h>
 #include "Array.h"
+#define NO_MUTEX
+#include "Evolution.h"
+
 
 /**
  * The Element Type of the Array to sort
@@ -49,3 +54,4 @@ void insertionsort_min(CHIEFSORT_TYPE *ary, int length);
 void insertionsort_max(CHIEFSORT_TYPE *ary, int length);
 void quicksort(CHIEFSORT_TYPE *ary, int length);
 void paralellsort(CHIEFSORT_TYPE *ary, int length, int min_insertionsort, int threads);
+#endif
