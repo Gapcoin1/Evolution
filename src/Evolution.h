@@ -168,7 +168,8 @@ Individual best_evolution(void *(*init_individual) (void *), void (*clone_indivi
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, void *opts, short flags);
-u_int64_t ev_size(int population_size, int num_threads, int keep_last_generation);
+u_int64_t ev_size(int population_size, int num_threads, int keep_last_generation, 
+                                        u_int64_t sizeof_iv, u_int64_t sizeof_opt);
 // parallel functions
 Evolution *new_evolution_parallel(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                                    void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
