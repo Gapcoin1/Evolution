@@ -546,6 +546,7 @@ Individual *evolute_parallel(Evolution *ev) {
                 || (ev->use_abort_requirement && ev->continue_ev(ev->individuals, ev->opts[0]))); i++) {
     
     ev->parallel.info.improovs = 0;
+    ev->parallel.generations_progressed = i;
   
     /**
      * If we keep the last generation, we can recombinate in place
