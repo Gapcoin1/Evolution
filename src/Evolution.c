@@ -840,8 +840,7 @@ void *threadable_mutation_onely_rand(void *arg) {
 /**
  * returns the Size an Evolution with the given args will have
  */
-u_int64_t ev_size(int population_size, int generation_limit, 
-                    int num_threads, int keep_last_generation) {
+u_int64_t ev_size(int population_size, int num_threads, int keep_last_generation) {
   
   u_int64_t mul = keep_last_generation ? 1 : 2;
 
