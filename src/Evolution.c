@@ -225,8 +225,8 @@ Evolution *new_evolution_parallel(void *(*init_individual) (void *), void (*clon
   } else {
     for (i = 0; i < population_size * mul; i++) {
       ev->population[i] = ev->individuals + i;
-      ev->individuals[i].individual = init_individual(ev->opts);
-      ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts);
+      ev->individuals[i].individual = init_individual(ev->opts[0]);
+      ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts[0]);
  
       if (ev->verbose >= EV_VERBOSE_ONELINE)
         printf("init population: %10d\r", population_size * mul - i);
