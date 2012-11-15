@@ -39,6 +39,7 @@ typedef struct {
 #define EV_VERBOSE_QUIET          0
 #define EV_VERBOSE_ONELINE        256
 #define EV_VERBOSE_HIGH           512
+#define EV_VERBOSE_ULTRA          768
 
 /**
  * Shorter Flags
@@ -53,6 +54,7 @@ typedef struct {
 #define EV_VEB0 EV_VERBOSE_QUIET
 #define EV_VEB1 EV_VERBOSE_ONELINE
 #define EV_VEB2 EV_VERBOSE_HIGH
+#define EV_VEB3 EV_VERBOSE_ULTRA
 
 /**
  * An Individual wich has an definied fitness

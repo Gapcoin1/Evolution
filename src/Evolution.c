@@ -327,6 +327,9 @@ Individual *evolute(Evolution *ev) {
         if (ev->verbose >= EV_VERBOSE_ONELINE) {
           printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", 
                                             ev->generation_limit - i, end - j, last_improovs_str);
+        if (ev->verbose >= EV_VERBOSE_ULTRA) {
+          printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\n", 
+                                            ev->generation_limit - i, end - j, last_improovs_str);
         }
       }
     // copy and mutate individuals
@@ -357,6 +360,9 @@ Individual *evolute(Evolution *ev) {
           if (ev->verbose >= EV_VERBOSE_ONELINE) {
             printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
                                             ev->generation_limit - i, start - j, last_improovs_str);
+          if (ev->verbose >= EV_VERBOSE_ULTRA) {
+            printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\n", 
+                                            ev->generation_limit - i, start - j, last_improovs_str);
           }
         }
 
@@ -385,6 +391,9 @@ Individual *evolute(Evolution *ev) {
          
           if (ev->verbose >= EV_VERBOSE_ONELINE) {
             printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", 
+                                          ev->generation_limit - i, end - j, last_improovs_str);
+          if (ev->verbose >= EV_VERBOSE_ULTRA) {
+            printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\n", 
                                           ev->generation_limit - i, end - j, last_improovs_str);
           }
         }
@@ -712,6 +721,12 @@ void *threadable_recombinate(void *arg) {
                 ev->generation_limit - ev->parallel.generations_progressed, ev->parallel.end - j, ev->parallel.last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
+    if (ev->verbose >= EV_VERBOSE_ULTRA) {
+      pthread_mutex_lock(&ev_mutex);
+        printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\n", 
+                ev->generation_limit - ev->parallel.generations_progressed, ev->parallel.end - j, ev->parallel.last_improovs_str);
+      pthread_mutex_unlock(&ev_mutex);
+    }
   }
 
   // after break we must unlock
@@ -767,6 +782,12 @@ void *threadable_mutation_onely_1half(void *arg) {
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
+                                        ev->generation_limit - ev->parallel.generations_progressed, ev->parallel.start - j, ev->parallel.last_improovs_str);
+      pthread_mutex_unlock(&ev_mutex);
+    }
+    if (ev->verbose >= EV_VERBOSE_ULTRA) {
+      pthread_mutex_lock(&ev_mutex);
+        printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\n", 
                                         ev->generation_limit - ev->parallel.generations_progressed, ev->parallel.start - j, ev->parallel.last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
@@ -826,6 +847,12 @@ void *threadable_mutation_onely_rand(void *arg) {
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", 
+                                      ev->generation_limit - ev->parallel.generations_progressed, ev->parallel.end - j, ev->parallel.last_improovs_str);
+      pthread_mutex_unlock(&ev_mutex);
+    }
+    if (ev->verbose >= EV_VERBOSE_ULTRA) {
+      pthread_mutex_lock(&ev_mutex);
+        printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\n", 
                                       ev->generation_limit - ev->parallel.generations_progressed, ev->parallel.end - j, ev->parallel.last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
