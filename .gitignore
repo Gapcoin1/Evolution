@@ -1,0 +1,9 @@
+bin/*
+*.swp
+*.swn
+a.out
+*.swo
+*.gch
+*callgrind.out*
+*.bmp
+*.o
