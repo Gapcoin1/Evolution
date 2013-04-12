@@ -8,40 +8,48 @@
  *
  * opts can be used for aditional function wide values
  *
- * +----------------------------------------------+------------------------------------------------------+
- * function pointer                               | describtion                                          |
- * +----------------------------------------------+------------------------------------------------------+
- * | void *init_individual(void *opts)            | should return an void pointer to an new initialized  |
- * |                                              | individual                                           |
- * |                                              |                                                      |
- * | void clone_individual(void *dst, void *src,  | takes two void pointer to individuals and should     |
- * |                        void *opts)           | clone the content of the second one                  |
- * |                                              | into the first one                                   |
- * |                                              |                                                      |
- * | void free_individual(void *src, void *opts)  | takes an void pointer to individual and should free  |
- * |                                              | the spaces allocated by the given individual         |
- * |                                              |                                                      |
- * | void mutate(Individual *src, void *opts)     | takes an void pointer to an individual and should    |
- * |                                              | change it in a way that the probability to           |
- * |                                              | improove it is around 1/5                            |
- * |                                              |                                                      |
- * | int fitness(Individual *src, void *opts)     | takes an void pointer to an individual, and should   |
- * |                                              | return an integer value that indicates how strong    |
- * |                                              | (good / improoved / near by an optimal solution) it  |
- * |                                              | is. Control the sorting order with the sort flags    |
- * |                                              |                                                      |
- * | void recombinate(Individual *src1,           | takes three void pointer to individuals and should   |
- * |                   Individual *src2,          | combinate the first two one, and should save the     |
- * |                    Individual *dst,          | result in the thired one. As mutate the probability  |
- * |                          void *opts)         | to get an improoved individuals should be around 1/5 |
- * |                                              |                                                      |
- * | char continue_ev(Individual *ivs,            | takes an pointer to the current Individuals and      |
- * |                           void *opts)        | should return 0 if the calculaten should stop and    |
- * |                                              | 1 if the calculaten should continue                  |
- * +----------------------------------------------+------------------------------------------------------+
+ * +------------------------------------+-------------------------------------+
+ * | function pointer                   | describtion                         |
+ * +------------------------------------+-------------------------------------+
+ * | void *init_individual(void *opts)  | should return an void pointer to an |
+ * |                                    | new initialized individual          |
+ * |                                    |                                     |
+ * | void clone_individual(void *dst,   | takes 2 void pointer to individuals |
+ * |                       void *src,   | and should clone the content of the |
+ * |                       void *opts)  | second one into the first one       |
+ * |                                    |                                     |
+ * | void free_individual(void *src,    | takes an void pointer to individual |
+ * |                      void *opts)   | and should free the spaces          |
+ * |                                    | allocated by the given individual   |
+ * |                                    |                                     |
+ * | void mutate(Individual *src,       | takes an void pointer to an         |
+ * |             void *opts)            | individual and should change it in  |
+ * |                                    | a way that the probability to       |
+ * |                                    | improove it is around 1/5           |
+ * |                                    |                                     |
+ * | int fitness(Individual *src,       | takes an void pointer to an         |
+ * |             void *opts)            | individual, and should return an    |
+ * |                                    | integer value that indicates how    |
+ * |                                    | strong (good / improoved / near by  |
+ * |                                    | an optimal solution) it is. Control |
+ * |                                    | the sorting order with the flags    |
+ * |                                    |                                     |
+ * | void recombinate(Individual *src1, | takes 3 void pointer to individuals |
+ * |                  Individual *src2, | and should combinate the first two  |
+ * |                  Individual *dst,  | one, and should save the result in  |
+ * |                  void *opts)       | the thired one. As mutate the       |
+ * |                                    | probability to get an improoved     |
+ * |                                    | individuals should be around 1/5    |
+ * |                                    |                                     |
+ * | char continue_ev(Individual *ivs,  | takes an pointer to the current     |
+ * |                  void *opts)       | Individuals and should return 0 if  |
+ * |                                    | the calculaten should stop and 1 if |
+ * |                                    | the calculaten should continue      |
+ * +------------------------------------+-------------------------------------+
  *
- * Note: the void pointer to individuals are not pointer to an Individual struct, theu are the individual element
- *        of the Individual struct
+ * Note: the void pointer to individuals are not pointer to an Individual 
+ *       struct, they are the individual element of the Individual struct
+ *
  * flags can be:
  *
  *    EV_UREC / EV_USE_RECOMBINATION
@@ -51,71 +59,97 @@
  *    EV_ABRT / EV_USE_ABORT_REQUIREMENT
  *    EV_SMAX / EV_SORT_MAX
  *    EV_SMIN / EV_SORT_MIN
+ *    EV_VEB0 / EV_VERBOSE_QUIET
+ *    EV_VER1 / EV_VERBOSE_ONELINE
+ *    EV_VER2 / EV_VERBOSE_HIGH
+ *    EV_VER3 / EV_VERBOSE_ULTRA
  *
  * The floowing flag combinations are possible:
  *
- * +-------------------------------------------+---------------------------------------------------------+
- * | Flag combination                          | descrion                                                |
- * +-------------------------------------------+---------------------------------------------------------+
- * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT   | Recombinate and always mutate individual,               |
- * |                                           | keep last generation, and use abort requirement         |
- * |                                           | function                                                |
- * |                                           |                                                         |
- * | EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT           | Onley mutate individual keep last generation and use    |
- * |                                           | abort requirement function                              |
- * |                                           |                                                         |
- * | EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT           | Recombinate and maybe mutate individual (depending on   |
- * |                                           | a given probability) keep last generation and use       |
- * |                                           | abort requirement function                              |
- * |                                           |                                                         |
- * | EV_UREC|EV_KEEP|EV_ABRT                   | Recombinate individuals, keep last generation and use   |
- * |                                           | abort requirement function)                             |
- * |                                           |                                                         |
- * | EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT           | Recombinate and always mutate individuals, disgard      |
- * |                                           | last generation. and use abort requirement function     |
- * |                                           |                                                         |
- * | EV_UMUT|EV_AMUT|EV_ABRT                   | Onely mutate individuals, disgard last generation,      |
- * |                                           | and use abort requirement function                      |
- * |                                           |                                                         |
- * | EV_UREC|EV_UMUT|EV_ABRT                   | Recombinate and maybe mutate individuals (depending     |
- * |                                           | on a given probability), disgard last generation and    |
- * |                                           | use abort requirement function                          |
- * |                                           |                                                         |
- * | EV_UREC|EV_ABRT                           | Recombinate individuals, disgard last generation and    |
- * |                                           | use abort requirement function                          |
- * |                                           |                                                         |
- * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP           | Recombinate and always mutate individuals, keep last    |
- * |                                           | generation, and calc until generation limit is          |
- * |                                           | reatched                                                |
- * |                                           |                                                         |
- * | EV_UMUT|EV_AMUT|EV_KEEP                   | Onely mutate individuals, keep last generation and      |
- * |                                           | calc until generation limit is reatched                 |
- * |                                           |                                                         |
- * | EV_UREC|EV_UMUT|EV_KEEP                   | Recombinate and maybe mutate individuals, keep last     |
- * |                                           | generation and calc until generation limit is           |
- * |                                           | reatched                                                |
- * |                                           |                                                         |
- * | EV_UREC|EV_KEEP                           | Recombinate individuals, keep last generation and       |
- * |                                           | calc until generation limit is reatched                 |
- * |                                           |                                                         |
- * | EV_UREC|EV_UMUT|EV_AMUT                   | Recombinate and always mutate individuals, disgard last |
- * |                                           | generation and calc until generation imit is reatched   |
- * |                                           |                                                         |
- * | EV_UMUT|EV_AMUT                           | Recombinate and always mutate Individuals disgard orld  |
- * |                                           | generation and calc until generation limit is reatched  |
- * |                                           |                                                         |
- * | EV_UREC|EV_UMUT                           | Recombinate and maybe mutate Individual (depending on a |
- * |                                           | given probability) disgard old generation and calc      |
- * |                                           | until generation limit is reatched                      |
- * |                                           |                                                         |
- * | EV_UREC                                   | Recombinate Individual onley disgard old generation and |
- * |                                           | calc until generation limit is reatched                 |
- * +-------------------------------------------+---------------------------------------------------------+
+ * +---------------------------------+----------------------------------------+
+ * | Flag combination                | descrion                               |
+ * +---------------------------------+----------------------------------------+
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP | Recombinate and always mutate          |
+ * | |EV_ABRT                        | individuals, keep last generation,     |
+ * |                                 | and use abort requirement function     |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT | Onley mutate individual keep last      |
+ * |                                 | generation and use abort requirement   |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT | Recombinate and maybe mutate           |
+ * |                                 | individuals (depending on a given      |
+ * |                                 | probability) keep last generation and  |
+ * |                                 | use abort requirement function         |
+ * |                                 |                                        |
+ * | EV_UREC|EV_KEEP|EV_ABRT         | Recombinate individuals, keep last     |
+ * |                                 | generation and use abort requirement   |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT | Recombinate and always mutate          |
+ * |                                 | individuals, disgard last generation.  |
+ * |                                 | and use abort requirement function     |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT|EV_ABRT         | Onely mutate individuals, disgard last |
+ * |                                 | generation, and use abort requirement  |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_ABRT         | Recombinate and maybe mutate           |
+ * |                                 | individuals (depending on a given      |
+ * |                                 | probability), disgard last generation  |
+ * |                                 | and use abort requirement function     |
+ * |                                 |                                        |
+ * | EV_UREC|EV_ABRT                 | Recombinate individuals, disgard last  |
+ * |                                 | generation and use abort requirement   |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP | Recombinate and always mutate          |
+ * |                                 | individuals, keep last generation, and |
+ * |                                 | calc until generation limit is         |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT|EV_KEEP         | Onely mutate individuals, keep last    |
+ * |                                 | generation and calc until generation   |
+ * |                                 | limit is reatched                      |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_KEEP         | Recombinate and maybe mutate           |
+ * |                                 | individuals, keep last generation and  |
+ * |                                 | calc until generation limit is         |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_KEEP                 | Recombinate individuals, keep last     |
+ * |                                 | generation and calc until generation   |
+ * |                                 | limit is reatched                      |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_AMUT         | Recombinate and always mutate          |
+ * |                                 | individuals, disgard last generation   |
+ * |                                 | and calc until generation imit is      |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT                 | Recombinate and always mutate          |
+ * |                                 | Individuals disgard old generation and |
+ * |                                 | calc until generation limit is         |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT                 | Recombinate and maybe mutate           |
+ * |                                 | Individual (depending on a given       |
+ * |                                 | probability) disgard old generation    |
+ * |                                 | and calc until generation limit is     |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UREC                         | Recombinate Individual onley disgard   |
+ * |                                 | old generation and calc until          |
+ * |                                 | generation limit is reatched           |
+ * +---------------------------------+----------------------------------------+
  *
  * to all of the above combination an EV_SMIN / EV_SMAX can be added
  * standart is EV_SMIN
- * Also an verbosytiy level of EV_VERBOSE_QUIET (EV_VEB0), EV_VERBOSE_ONELINE (EV_VEB1)
- * and EV_VERBOSE_HIGH (EV_VEB2) can be added, standart is EV_VERBOSE_QUIET
+ * Also an verbosytiy level of:
+ *    EV_VERBOSE_QUIET    (EV_VEB0), 
+ *    EV_VERBOSE_ONELINE  (EV_VEB1)
+ *    EV_VERBOSE_HIGH     (EV_VEB2) 
+ *    EV_VERBOSE_ULTRA    (EV_VEB3)
+ * can be added, standart is EV_VERBOSE_QUIET
  */
 Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
