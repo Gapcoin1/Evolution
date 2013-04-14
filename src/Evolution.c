@@ -3,6 +3,43 @@
 #include "Evolution.h"
 
 /**
+ * Functions for Sorting the Population by Fitness
+ * Macro versions
+ */
+static inline char macro_bigger(Individual *a, Individual *b) {
+  return a->fitness > b->fitness;
+}
+
+static inline char macro_smaler(Individual *a, Individual *b) {
+  return a->fitness < b->fitness;
+}
+
+static inline char macro_equal(Individual *a, Individual *b) {
+  return a->fitness == b->fitness;
+}
+
+/* void pointer version */
+char macro_bigger(void *a, void *b) {
+  return ((Individual *) a)->fitness > ((Individual *) b)->fitness;
+}
+
+char macro_smaler(void *a, void *b) {
+  return ((Individual *) a)->fitness < ((Individual *) b)->fitness;
+}
+
+char macro_equal(void *a, void *b) {
+  return ((Individual *) a)->fitness == ((Individual *) b)->fitness;
+}
+
+#define CHIEFSORT_TYPE Individual *
+#define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
+#define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
+#define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
+#define EV_MIN_QUICKSORT 20
+#include "sort.h"
+
+
+/**
  * Returns pointer to an new and initialzed Evolution
  * take pointers for varius functions:
  *

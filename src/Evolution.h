@@ -6,6 +6,7 @@
 #ifndef EVOLUTION_HEADER
 #define EVOLUTION_HEADER
 #include <pthread.h>
+#include "C-Utils/Sort/src/sort.h"
 
 // Evolution mutex
 #ifndef NO_MUTEX
@@ -66,14 +67,14 @@ typedef struct {
 } Individual;
 
 /**
- * Macros for Sorting the Population by Fitness
+ * Functions for Sorting the Population by Fitness
+ * void pointer version 
  */
-#define CHIEFSORT_TYPE Individual *
-#define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
-#define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
-#define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
-#define EV_MIN_QUICKSORT 20
-#include "sort.h"
+char macro_bigger(void *a, void *b);
+char macro_smaler(void *a, void *b);
+char macro_equal(void *a, void *b);
+
+
 
 /**
  * Sorts the best Individual at top of the population array
