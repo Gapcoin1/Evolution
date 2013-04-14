@@ -151,22 +151,45 @@
  *    EV_VERBOSE_ULTRA    (EV_VEB3)
  * can be added, standart is EV_VERBOSE_QUIET
  */
-Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                int population_size, int generation_limit, double mutation_propability,
-                                  double death_percentage, void *opts, short flags) {
+Evolution *new_evolution(void *(*init_individual) (void *), 
+                         void (*clone_individual) (void *, void *, void *),
+                         void (*free_individual) (void *, void *), 
+                         void (*mutate) (Individual *, void *),
+                         int (*fitness) (Individual *, void *), 
+                         void (*recombinate) (Individual *,
+                                              Individual *, 
+                                              Individual *, 
+                                              void *), 
+                         char (*continue_ev) (Individual *, void *),
+                         int population_size, 
+                         int generation_limit, 
+                         double mutation_propability,
+                         double death_percentage, 
+                         void *opts, 
+                         short flags) {
 
-  return new_evolution_parallel(init_individual, clone_individual, free_individual, mutate, fitness, recombinate, continue_ev,
-                                  population_size, generation_limit, mutation_propability, death_percentage, &opts, 1, flags);
+  return new_evolution_parallel(init_individual, 
+                                clone_individual, 
+                                free_individual, 
+                                mutate, fitness, 
+                                recombinate, 
+                                continue_ev,
+                                population_size, 
+                                generation_limit, 
+                                mutation_propability, 
+                                death_percentage, 
+                                &opts, 
+                                1, 
+                                flags);
 }
 
 /**
  * Parallel version takes multiple opts pointer each one for each thread
  */
-Evolution *new_evolution_parallel(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                                   void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
+Evolution *new_evolution_parallel(void *(*init_individual) (void *), 
+                                  void (*clone_individual) (void *, void *, void *),
+                                  void (*free_individual) (void *, void *), 
+                                  void (*mutate) (Individual *, void *),
                                     int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                                      Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                       int population_size, int generation_limit, double mutation_propability,
