@@ -1,6 +1,6 @@
 #ifndef EVOLUTION
 #define EVOLUTION
-#include "Evolution.h"
+#include "evolution.h"
 
 /**
  * Functions for Sorting the Population by Fitness
@@ -30,13 +30,6 @@ char macro_smaler(void *a, void *b) {
 char macro_equal(void *a, void *b) {
   return ((Individual *) a)->fitness == ((Individual *) b)->fitness;
 }
-
-#define CHIEFSORT_TYPE Individual *
-#define CHIEFSORT_BIGGER(X, Y) X->fitness > Y->fitness
-#define CHIEFSORT_SMALER(X, Y) X->fitness < Y->fitness
-#define CHIEFSORT_EQL(X, Y) X->fitness == Y->fitness
-#define EV_MIN_QUICKSORT 20
-#include "sort.h"
 
 
 /**
@@ -515,10 +508,34 @@ Individual *evolute(Evolution *ev) {
      * Select the best individuals to survive,
      * Sort the Individuals by theur fittnes
      */
-    if (ev->sort_max)
-      EVOLUTION_SELECTION_MAX(ev)
-    else
-      EVOLUTION_SELECTION_MIN(ev)
+    if (ev->sort_max) {
+      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
+        paralell_quickinsersort_max(&ev->paralell.sort_args);
+      } 
+      else {
+        QUICK_INSERT_SORT_MAX(Individual *, 
+                              ev->population, 
+                              ev->population_size, 
+                              macro_bigger, 
+                              macro_smaler, 
+                              macro_smaler,
+                              ev->min_quicksort);
+      }
+    }
+    else {
+      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
+        paralell_quickinsersort_min(&ev->paralell.sort_args);
+      } 
+      else {
+        QUICK_INSERT_SORT_MIN(Individual *, 
+                              ev->population, 
+                              ev->population_size, 
+                              macro_bigger, 
+                              macro_smaler, 
+                              macro_smaler,
+                              ev->min_quicksort);
+      }
+    }
 
     if (ev->verbose >= EV_VERBOSE_ONELINE)
       sprintf(last_improovs_str, "%.5f", (info.improovs / (double) deaths) * 100.0);
@@ -730,10 +747,34 @@ Individual *evolute_parallel(Evolution *ev) {
      * Select the best individuals to survive,
      * Sort the Individuals by theur fittnes
      */
-    if (ev->sort_max)
-      EVOLUTION_SELECTION_MAX(ev)
-    else
-      EVOLUTION_SELECTION_MIN(ev)
+    if (ev->sort_max) {
+      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
+        paralell_quickinsersort_max(&ev->paralell.sort_args);
+      } 
+      else {
+        QUICK_INSERT_SORT_MAX(Individual *, 
+                              ev->population, 
+                              ev->population_size, 
+                              macro_bigger, 
+                              macro_smaler, 
+                              macro_smaler,
+                              ev->min_quicksort);
+      }
+    }
+    else {
+      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
+        paralell_quickinsersort_min(&ev->paralell.sort_args);
+      } 
+      else {
+        QUICK_INSERT_SORT_MIN(Individual *, 
+                              ev->population, 
+                              ev->population_size, 
+                              macro_bigger, 
+                              macro_smaler, 
+                              macro_smaler,
+                              ev->min_quicksort);
+      }
+    }
 
     if (ev->verbose >= EV_VERBOSE_ONELINE)
       sprintf(ev->parallel.last_improovs_str, "%.5f", (ev->parallel.info.improovs / (double) deaths) * 100.0);

@@ -144,10 +144,17 @@ struct Evolution {
   char sort_max;                            /* if the individuals should be sorted by max or min fittnes */
   void **opts;                              /* pointer to aditional opts which is given to each function */
   short verbose;                            /* the verbosity level */
+  uint32_t min_quicksort;                   /* min array length to change    *
+                                             * sorting from qick- to         *
+                                             * insertionsort                 */            
   struct {
     int i, start, end, num_threads, 
         mutate, generations_progressed;
+    uint32_t n_threads_sort_paralell;       /* number of threads so that    *
+                                             * paralell sort beats macro    *
+                                             * based sorting                */
     pthread_t *threads;
+    QISTA_t *sort_args;                     /* args for paralell sorting */
     EvolutionThread *ev_threads;
     char last_improovs_str[25];
     EvolutionInfo info;
