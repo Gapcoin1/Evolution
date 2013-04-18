@@ -1,6 +1,7 @@
 #ifndef EVOLUTION
 #define EVOLUTION
 #include "evolution.h"
+#include "C-Utils/Debug/src/debug.h"
 
 // Evolution mutex
 static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -9,31 +10,45 @@ static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
  * Functions for Sorting the Population by Fitness
  * Macro versions
  */
-static inline char macro_bigger(Individual *a, Individual *b) {
+static inline char ev_bigger(Individual *a, Individual *b) {
   return a->fitness > b->fitness;
 }
 
-static inline char macro_smaler(Individual *a, Individual *b) {
+static inline char ev_smaler(Individual *a, Individual *b) {
   return a->fitness < b->fitness;
 }
 
-static inline char macro_equal(Individual *a, Individual *b) {
+static inline char ev_equal(Individual *a, Individual *b) {
   return a->fitness == b->fitness;
 }
 
-/* void pointer version */
-char void_ptr_bigger(void *a, void *b) {
-  return ((Individual *) a)->fitness > ((Individual *) b)->fitness;
-}
-
-char void_ptr_smaler(void *a, void *b) {
-  return ((Individual *) a)->fitness < ((Individual *) b)->fitness;
-}
-
-char void_ptr_equal(void *a, void *b) {
-  return ((Individual *) a)->fitness == ((Individual *) b)->fitness;
-}
-
+/**
+ * Macro for sorting the Evolution by fittnes 
+ * using Macro based version onely because
+ * paralell version will propably need more then
+ * 16 Corse to be efficient
+ */
+#define EV_SELECTION(EV)                                      \
+  do {                                                        \
+    printf("[DEBUG] population_size %d, min %d\n", EV->population_size, EV->min_quicksort); \
+    if ((EV)->sort_max) {                                     \
+      QUICK_INSERT_SORT_MAX(Individual *,                     \
+                            (EV)->population,                 \
+                            (EV)->population_size,            \
+                            ev_bigger,                        \
+                            ev_smaler,                        \
+                            ev_equal,                         \
+                            (EV)->min_quicksort);             \
+    } else {                                                  \
+      QUICK_INSERT_SORT_MIN(Individual *,                     \
+                            (EV)->population,                 \
+                            (EV)->population_size,            \
+                            ev_bigger,                        \
+                            ev_smaler,                        \
+                            ev_equal,                         \
+                            (EV)->min_quicksort);             \
+    }                                                         \
+  } while (0)
 
 /**
  * Returns pointer to an new and initialzed Evolution
@@ -220,6 +235,38 @@ Evolution *new_evolution(void *(*init_individual) (void *),
 }
 
 /**
+ * Returns if a given flag combination is invalid
+ */
+static char ev_flags_invalid(uint64_t flags) {
+
+  /**
+   * Sorting and verbose flags
+   * can be used with any flag combination
+   */
+  int tflags = flags & ~EV_SMAX;
+  tflags &= ~EV_VEB1;
+  tflags &= ~EV_VEB2;
+  tflags &= ~EV_VEB3;
+  
+  return tflags != EV_UREC 
+         && tflags != (EV_UREC|EV_UMUT) 
+         && tflags != (EV_UREC|EV_UMUT|EV_AMUT)
+         && tflags != (EV_UREC|EV_KEEP) 
+         && tflags != (EV_UREC|EV_UMUT|EV_KEEP)
+         && tflags != (EV_UMUT|EV_AMUT|EV_KEEP) 
+         && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)
+         && tflags != (EV_UREC|EV_ABRT) 
+         && tflags != (EV_UREC|EV_UMUT|EV_ABRT)
+         && tflags != (EV_UMUT|EV_AMUT|EV_ABRT) 
+         && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)
+         && tflags != (EV_UREC|EV_KEEP|EV_ABRT) 
+         && tflags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)
+         && tflags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)
+         && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT);
+
+}
+
+/**
  * Parallel version takes multiple opts pointer each one for each thread
  */
 Evolution *new_evolution_parallel(void *(*init_individual) (void *), 
@@ -231,34 +278,20 @@ Evolution *new_evolution_parallel(void *(*init_individual) (void *),
                                       int population_size, int generation_limit, double mutation_propability,
                                        double death_percentage, void **opts, int num_threads, short flags) {
 
-  int tflags = flags & ~EV_SMAX;
-  tflags &= ~EV_VEB1;
-  tflags &= ~EV_VEB2;
-  // valid flag combination ?
-  if (tflags != EV_UREC && tflags != (EV_UREC|EV_UMUT) && tflags != (EV_UREC|EV_UMUT|EV_AMUT)
-       && tflags != (EV_UREC|EV_KEEP) && tflags != (EV_UREC|EV_UMUT|EV_KEEP)
-        && tflags != (EV_UMUT|EV_AMUT|EV_KEEP) && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)
-         && tflags != (EV_UREC|EV_ABRT) && tflags != (EV_UREC|EV_UMUT|EV_ABRT)
-          && tflags != (EV_UMUT|EV_AMUT|EV_ABRT) && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)
-           && tflags != (EV_UREC|EV_KEEP|EV_ABRT) && tflags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)
-            && tflags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)
-              && tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)) {
-    
-    #ifdef DEBUG
-      printf("[DEBUG] wrong flag combination\n");
-    #endif
-
+  if (ev_flags_invalid(flags)) {
+    DBG_MSG("wrong flag combination");
     return NULL;
   }
 
   // valid other opts
-  if (population_size <= 0 || generation_limit <= 0 || mutation_propability < 0.0 
-        || mutation_propability > 1.0 || death_percentage < 0.0 || death_percentage > 1.0) {
+  if (population_size <= 0 
+      || generation_limit <= 0 
+      || mutation_propability < 0.0 
+      || mutation_propability > 1.0 
+      || death_percentage < 0.0 
+      || death_percentage > 1.0) {
    
-    #ifdef DEBUG
-      printf("[DEBUG] wrong opts\n");
-    #endif
-
+    DBG_MSG("wrong opts");
     return NULL;
   }
   
@@ -267,38 +300,44 @@ Evolution *new_evolution_parallel(void *(*init_individual) (void *),
 
   Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
 
-  ev->init_individual        = init_individual;
-  ev->clone_individual       = clone_individual;
-  ev->free_individual        = free_individual;
-  ev->mutate                 = mutate;
-  ev->fitness                = fitness;
-  ev->recombinate            = recombinate;
-  ev->continue_ev            = continue_ev;
-  ev->population_size        = population_size;
-  ev->generation_limit       = generation_limit;
-  ev->mutation_propability   = mutation_propability;
-  ev->death_percentage       = death_percentage;
-  ev->opts                   = opts;
-  ev->parallel.num_threads   = num_threads;
-  ev->parallel.i             = 0;
-  ev->parallel.info.improovs = 0;
-  ev->parallel.threads       = malloc(sizeof(pthread_t) * num_threads);
-  ev->parallel.ev_threads    = malloc(sizeof(EvolutionThread) * num_threads);
-  ev->parallel.mutate        = (int) ((double) EVOLUTION_MUTATE_ACCURACY * ev->mutation_propability);
-  ev->use_recmbination       = flags & EV_USE_RECOMBINATION;
-  ev->use_muttation          = flags & EV_USE_MUTATION;
-  ev->always_mutate          = flags & EV_ALWAYS_MUTATE;
-  ev->keep_last_generation   = flags & EV_KEEP_LAST_GENERATION;
-  ev->use_abort_requirement  = flags & EV_USE_ABORT_REQUIREMENT;
-  ev->sort_max               = flags & EV_SORT_MAX;
-  ev->verbose                = flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
-
-
-  // multiplicator if we should discard the last generation, we can't recombinate in place
+  /**
+   * multiplicator: if we should discard the last generation, 
+   * we can't recombinate in place
+   */
   int mul = ev->keep_last_generation ? 1 : 2;
-
-  ev->population  = (Individual **) malloc(sizeof(Individual *) * population_size * mul);
-  ev->individuals = (Individual *) malloc(sizeof(Individual) * population_size * mul);
+  size_t population_space       = sizeof(Individual *) * population_size * mul;
+  size_t individuals_space      = sizeof(Individual) * population_size * mul;
+                                
+  ev->population                = (Individual **) malloc(population_space);
+  ev->individuals               = (Individual *) malloc(individuals_space);
+  ev->init_individual           = init_individual;
+  ev->clone_individual          = clone_individual;
+  ev->free_individual           = free_individual;
+  ev->mutate                    = mutate;
+  ev->fitness                   = fitness;
+  ev->recombinate               = recombinate;
+  ev->continue_ev               = continue_ev;
+  ev->population_size           = population_size;
+  ev->generation_limit          = generation_limit;
+  ev->mutation_propability      = mutation_propability;
+  ev->death_percentage          = death_percentage;
+  ev->opts                      = opts;
+  ev->parallel.num_threads      = num_threads;
+  ev->parallel.i                = 0;
+  ev->parallel.info.improovs    = 0;
+  ev->parallel.threads          = malloc(sizeof(pthread_t) * num_threads);
+  ev->parallel.ev_threads       = malloc(sizeof(EvolutionThread) 
+                                         * num_threads);
+  ev->parallel.mutate           = (int) ((double) EV_MUT_ACCURACY 
+                                         * ev->mutation_propability);
+  ev->use_recombination          = flags & EV_USE_RECOMBINATION;
+  ev->use_muttation             = flags & EV_USE_MUTATION;
+  ev->always_mutate             = flags & EV_ALWAYS_MUTATE;
+  ev->keep_last_generation      = flags & EV_KEEP_LAST_GENERATION;
+  ev->use_abort_requirement     = flags & EV_USE_ABORT_REQUIREMENT;
+  ev->sort_max                  = flags & EV_SORT_MAX;
+  ev->verbose                   = flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
+  ev->min_quicksort             = EV_QICKSORT_MIN;
 
   int i;
   if (num_threads > 1) {
@@ -330,34 +369,7 @@ Evolution *new_evolution_parallel(void *(*init_individual) (void *),
    * Select the best individuals to survive,
    * Sort the Individuals by their fittnes
    */
-  if (ev->sort_max) {
-    if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
-      parallel_quickinsersort_max(&ev->parallel.sort_args); // TODO init sort_args, n_threads_sort_parallel, min_quicksort
-    } 
-    else {
-      QUICK_INSERT_SORT_MAX(Individual *, 
-                            ev->population, 
-                            ev->population_size, 
-                            macro_bigger, 
-                            macro_smaler, 
-                            macro_smaler,
-                            ev->min_quicksort);
-    }
-  }
-  else {
-    if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
-      parallel_quickinsersort_min(&ev->parallel.sort_args);
-    } 
-    else {
-      QUICK_INSERT_SORT_MIN(Individual *, 
-                            ev->population, 
-                            ev->population_size, 
-                            macro_bigger, 
-                            macro_smaler, 
-                            macro_smaler,
-                            ev->min_quicksort);
-    }
-  }
+  EV_SELECTION(ev); 
 
   if (ev->verbose >= EV_VERBOSE_HIGH)
     printf("Population Initialized\n");
@@ -376,7 +388,7 @@ Individual *evolute(Evolution *ev) {
 
   int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
   int survives = ev->population_size - deaths;
-  int mutate   = (int) ((double) EVOLUTION_MUTATE_ACCURACY * ev->mutation_propability);
+  int mutate   = (int) ((double) EV_MUT_ACCURACY * ev->mutation_propability);
   EvolutionInfo info;
   info.improovs = 0;
   Individual *tmp_iv;
@@ -402,7 +414,7 @@ Individual *evolute(Evolution *ev) {
     end   = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
 
 
-    if (ev->use_recmbination) {
+    if (ev->use_recombination) {
       for (j = start; j < end; j++) {
 
         // from 2 Individuals of the untouched part we calculate an new one
@@ -417,7 +429,7 @@ Individual *evolute(Evolution *ev) {
           if (ev->always_mutate)
             ev->mutate(ev->population[j], ev->opts[0]);
           else {
-            rand1 = rand() % EVOLUTION_MUTATE_ACCURACY;
+            rand1 = rand() % EV_MUT_ACCURACY;
             if (rand1 <= mutate)
               ev->mutate(ev->population[j], ev->opts[0]);
           }
@@ -538,34 +550,7 @@ Individual *evolute(Evolution *ev) {
      * Select the best individuals to survive,
      * Sort the Individuals by theur fittnes
      */
-    if (ev->sort_max) {
-      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
-        parallel_quickinsersort_max(&ev->parallel.sort_args);
-      } 
-      else {
-        QUICK_INSERT_SORT_MAX(Individual *, 
-                              ev->population, 
-                              ev->population_size, 
-                              macro_bigger, 
-                              macro_smaler, 
-                              macro_smaler,
-                              ev->min_quicksort);
-      }
-    }
-    else {
-      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
-        parallel_quickinsersort_min(&ev->parallel.sort_args);
-      } 
-      else {
-        QUICK_INSERT_SORT_MIN(Individual *, 
-                              ev->population, 
-                              ev->population_size, 
-                              macro_bigger, 
-                              macro_smaler, 
-                              macro_smaler,
-                              ev->min_quicksort);
-      }
-    }
+    EV_SELECTION(ev);
 
     if (ev->verbose >= EV_VERBOSE_ONELINE)
       sprintf(last_improovs_str, "%.5f", (info.improovs / (double) deaths) * 100.0);
@@ -709,7 +694,7 @@ Individual *evolute_parallel(Evolution *ev) {
     end   = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
 
 
-    if (ev->use_recmbination) {
+    if (ev->use_recombination) {
       ev->parallel.start = ev->parallel.i = start;
       ev->parallel.end = end;
 
@@ -777,34 +762,7 @@ Individual *evolute_parallel(Evolution *ev) {
      * Select the best individuals to survive,
      * Sort the Individuals by theur fittnes
      */
-    if (ev->sort_max) {
-      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
-        parallel_quickinsersort_max(&ev->parallel.sort_args);
-      } 
-      else {
-        QUICK_INSERT_SORT_MAX(Individual *, 
-                              ev->population, 
-                              ev->population_size, 
-                              macro_bigger, 
-                              macro_smaler, 
-                              macro_smaler,
-                              ev->min_quicksort);
-      }
-    }
-    else {
-      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
-        parallel_quickinsersort_min(&ev->parallel.sort_args);
-      } 
-      else {
-        QUICK_INSERT_SORT_MIN(Individual *, 
-                              ev->population, 
-                              ev->population_size, 
-                              macro_bigger, 
-                              macro_smaler, 
-                              macro_smaler,
-                              ev->min_quicksort);
-      }
-    }
+    EV_SELECTION(ev);
 
     if (ev->verbose >= EV_VERBOSE_ONELINE)
       sprintf(ev->parallel.last_improovs_str, "%.5f", (ev->parallel.info.improovs / (double) deaths) * 100.0);
@@ -853,7 +811,7 @@ void *threadable_recombinate(void *arg) {
       if (ev->always_mutate)
         ev->mutate(ev->population[j], ev->opts[evt->index]);
       else {
-        rand1 = rand() % EVOLUTION_MUTATE_ACCURACY;
+        rand1 = rand() % EV_MUT_ACCURACY;
         if (rand1 <= ev->parallel.mutate)
           ev->mutate(ev->population[j], ev->opts[evt->index]);
       }

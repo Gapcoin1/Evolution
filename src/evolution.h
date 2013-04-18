@@ -18,9 +18,8 @@ typedef struct {
 /**
  * Some Makros
  */
-#define EVOLUTION_TRUE  1
-#define EVOLUTION_FALSE 0
-#define EVOLUTION_MUTATE_ACCURACY 10000
+#define EV_MUT_ACCURACY 10000
+#define EV_QICKSORT_MIN 20
 
 /**
  * Flags for the new_evolution function
@@ -103,7 +102,7 @@ struct Evolution {
                          void *);           /*                               */
   void   (*mutate) (Individual *, void *);  /* mutation function             */
   long   (*fitness) (Individual *, void *); /* fittnes function */
-  char   use_recmbination;                  /* indicates wether to use recombination or not */
+  char   use_recombination;                  /* indicates wether to use recombination or not */
   char   use_muttation;                     /* indicates wether to use mutation or not */
   char   always_mutate;                     /* indicates wheter to always mutate or use probability */
   char   keep_last_generation;              /* indicates wheter to disgard last generation or not */
@@ -116,17 +115,13 @@ struct Evolution {
   char   sort_max;                            /* if the individuals should be sorted by max or min fittnes */
   void   **opts;                              /* pointer to aditional opts which is given to each function */
   short  verbose;                            /* the verbosity level */
-  int     min_quicksort;                     /* min array length to change    *
+  int    min_quicksort;                     /* min array length to change    *
                                              * sorting from qick- to         *
                                              * insertionsort                 */            
   struct {
     int i, start, end, num_threads, 
         mutate, generations_progressed;
-    int n_threads_sort_parallel;       /* number of threads so that    *
-                                             * parallel sort beats macro    *
-                                             * based sorting                */
     pthread_t *threads;
-    QISTA_t sort_args;                      /* args for parallel sorting */
     EvolutionThread *ev_threads;
     char last_improovs_str[25];
     EvolutionInfo info;

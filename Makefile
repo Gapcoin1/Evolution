@@ -7,7 +7,7 @@ SORT_BIN 						= $(SORT_SRC)/bin
 THREAD_CLIENTS_BIN 	= $(THREAD_CLIENTS_SRC)/bin
 TEST    						= ./test
 CC									= gcc
-CFLAGS							= -Wall -Wextra -Werror -c
+CFLAGS							= -Wall -Wextra -Werror -c -g -D DEBUG
 LDFLAGS							= -lm -lpthread $(SORT_BIN)/sort.o \
 																		$(THREAD_CLIENTS_BIN)/thread-clients.o
 OTFLAGS 						= -march=native
