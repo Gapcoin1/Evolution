@@ -8,8 +8,9 @@ THREAD_CLIENTS_BIN 	= $(THREAD_CLIENTS_SRC)/bin
 TEST    						= ./test
 CC									= gcc
 CFLAGS							= -Wall -Wextra -Werror -c -g -D DEBUG
-LDFLAGS							= -lm -lpthread $(SORT_BIN)/sort.o \
-																		$(THREAD_CLIENTS_BIN)/thread-clients.o
+LDFLAGS							= -lm -lpthread $(SORT_BIN)/sort.o 												\
+																		$(THREAD_CLIENTS_BIN)/thread-clients.o 		\
+																		$(THREAD_CLIENTS_BIN)/thread-client.o
 OTFLAGS 						= -march=native
 DBFLAGS							= -g
 
@@ -58,7 +59,8 @@ utils:
 	@echo "Make depending stuff"
 	mkdir -p ./bin
 	make -C $(SORT_SRC)
-	make -C $(THREAD_CLIENTS_SRC)
+	make -C $(THREAD_CLIENTS_SRC) thread-clients
+	make -C $(THREAD_CLIENTS_SRC) thread-client
 
 evolution: utils
 	@echo "Make Evolution"

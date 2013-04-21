@@ -90,10 +90,10 @@ int main(int argc, char *argv[]) {
   Individual *best;
   int opts[10];
 
-  Evolution *ev = new_evolution_parallel(init_v, clone_v, free_v, mutate_v, fittnes_v,
+  Evolution *ev = new_evolution_paralell(init_v, clone_v, free_v, mutate_v, fittnes_v,
                           recombinate_v, NULL, TEST_NUM_IVS, atoi(argv[1]), 1.0, 0.5, (void **) &opts, 4,
                              EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP);
-  best = evolute_parallel(ev);
+  best = evolute_paralell(ev);
 
   #ifndef NO_OUTPUT
   Vektor *v = (Vektor *) best->individual;

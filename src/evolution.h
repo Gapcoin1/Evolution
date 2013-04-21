@@ -5,8 +5,8 @@
  */
 #ifndef EVOLUTION_HEADER
 #define EVOLUTION_HEADER
-#include <pthread.h>
 #include "C-Utils/Sort/src/sort.h"
+#include "C-Utils/Thread-Clients/src/thread-client.h"
 
 /**
  * structur for aditional information during evolution
@@ -119,13 +119,13 @@ struct Evolution {
                                              * sorting from qick- to         *
                                              * insertionsort                 */            
   struct {
-    int i, start, end, num_threads, 
+    int i, start, end, num_threads,          // TODO explain, and my be better names 
         mutate, generations_progressed;
-    pthread_t *threads;
+    TClient *thread_clients;
     EvolutionThread *ev_threads;
     char last_improovs_str[25];
     EvolutionInfo info;
-  } parallel;
+  } paralell;
 };
 
 
@@ -147,21 +147,21 @@ Individual best_evolution(void *(*init_individual) (void *), void (*clone_indivi
                                   double death_percentage, void *opts, short flags);
 u_int64_t ev_size(int population_size, int num_threads, int keep_last_generation, 
                                         u_int64_t sizeof_iv, u_int64_t sizeof_opt);
-// parallel functions
-Evolution *new_evolution_parallel(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+// paralell functions
+Evolution *new_evolution_paralell(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                                    void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
                                     long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                                      Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                       int population_size, int generation_limit, double mutation_propability,
                                        double death_percentage, void **opts, int num_threads, short flags);
-Individual best_evolution_parallel(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+Individual best_evolution_paralell(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
                             long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, void **opts, int num_threads, short flags);
 void *threadable_init_individual(void *arg);
-Individual *evolute_parallel(Evolution *ev);
+Individual *evolute_paralell(Evolution *ev);
 void *threadable_recombinate(void *arg);
 void *threadable_mutation_onely_1half(void *args);
 void *threadable_mutation_onely_rand(void *args);
