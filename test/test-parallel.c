@@ -71,7 +71,7 @@ void mutate_v(Individual *src, void *opts) {
     v->f += (rand() % 3) - 1;
 }
 
-long fittnes_v(Individual *src, void *opts) {
+int64_t fittnes_v(Individual *src, void *opts) {
   (void) opts;
   Vektor *v = (Vektor *) src->individual;
 

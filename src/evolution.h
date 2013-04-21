@@ -16,7 +16,7 @@ typedef struct {
 } EvolutionInfo;
 
 /**
- * Some Makros
+ * Some standard values
  */
 #define EV_MUT_ACCURACY 10000
 #define EV_QICKSORT_MIN 20
@@ -56,9 +56,32 @@ typedef struct {
  * as higher as longer it lives
  */
 typedef struct {
-  void *individual;         /* void pointer to the Individual */
-  long fitness;             /* the fitness of this Individual */
+  void    *individual;         /* void pointer to the Individual */
+  int64_t fitness;             /* the fitness of this Individual */
 } Individual;
+
+/**
+ * Struct containg the neccesary information
+ * to initalize an Evolution struct
+ */
+typedef struct {
+  void     *(*init_individual) (void *);
+  void     (*clone_individual) (void *, void *, void *);
+  void     (*free_individual) (void *, void *);
+  void     (*mutate) (Individual *, void *);
+  int64_t  (*fitness) (Individual *, void *);
+  void     (*recombinate) (Individual *, Individual *, Individual *, void *);
+  char     (*continue_ev) (Individual *, void *);
+  int      population_size;
+  int      generation_limit;
+  double   mutation_propability;
+  double   death_percentage;
+  void     **opts;
+  int      num_threads; 
+  uint16_t flags;
+} EvInitArgs;
+
+
 
 /**
  * Functions for Sorting the Population by Fitness
@@ -101,7 +124,7 @@ struct Evolution {
                          Individual *,      /*                        dst)   */  
                          void *);           /*                               */
   void   (*mutate) (Individual *, void *);  /* mutation function             */
-  long   (*fitness) (Individual *, void *); /* fittnes function */
+  int64_t (*fitness) (Individual *, void *); /* fittnes function */
   char   use_recombination;                  /* indicates wether to use recombination or not */
   char   use_muttation;                     /* indicates wether to use mutation or not */
   char   always_mutate;                     /* indicates wheter to always mutate or use probability */
@@ -133,7 +156,7 @@ struct Evolution {
 // functions
 Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, void *opts, short flags);
@@ -141,7 +164,7 @@ Individual *evolute(Evolution *ev);
 void evolution_clean_up(Evolution *ev);
 Individual best_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, void *opts, short flags);
@@ -150,13 +173,13 @@ u_int64_t ev_size(int population_size, int num_threads, int keep_last_generation
 // paralell functions
 Evolution *new_evolution_paralell(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                                    void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                                    long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                                    int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                                      Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                       int population_size, int generation_limit, double mutation_propability,
                                        double death_percentage, void **opts, int num_threads, short flags);
 Individual best_evolution_paralell(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, void **opts, int num_threads, short flags);
