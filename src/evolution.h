@@ -9,7 +9,7 @@
 #include "C-Utils/Thread-Clients/src/thread-client.h"
 
 /**
- * structur for aditional information during evolution
+ * Structur holding aditional information during an evolution
  */
 typedef struct {
  int improovs; 
@@ -63,14 +63,189 @@ typedef struct {
 /**
  * Struct containg the neccesary information
  * to initalize an Evolution struct
+ *
+ * +------------------------------------+-------------------------------------+
+ * | Value                              | describtion                         |
+ * +------------------------------------+-------------------------------------+
+ * | void *init_individual(void *opts)  | should return an void pointer to an |
+ * |                                    | new initialized individual          |
+ * |                                    |                                     |
+ * | void clone_individual(void *dst,   | takes 2 void pointer to individuals |
+ * |                       void *src,   | and should clone the content of the |
+ * |                       void *opts)  | second one into the first one       |
+ * |                                    |                                     |
+ * | void free_individual(void *src,    | takes an void pointer to individual |
+ * |                      void *opts)   | and should free the spaces          |
+ * |                                    | allocated by the given individual   |
+ * |                                    |                                     |
+ * | void mutate(Individual *src,       | takes an void pointer to an         |
+ * |             void *opts)            | individual and should change it in  |
+ * |                                    | a way that the probability to       |
+ * |                                    | improove it is around 1/5           |
+ * |                                    |                                     |
+ * | int fitness(Individual *src,       | takes an void pointer to an         |
+ * |             void *opts)            | individual, and should return an    |
+ * |                                    | integer value that indicates how    |
+ * |                                    | strong (good / improoved / near by  |
+ * |                                    | an optimal solution) it is. Control |
+ * |                                    | the sorting order with the flags    |
+ * |                                    |                                     |
+ * | void recombinate(Individual *src1, | takes 3 void pointer to individuals |
+ * |                  Individual *src2, | and should combinate the first two  |
+ * |                  Individual *dst,  | one, and should save the result in  |
+ * |                  void *opts)       | the thired one. As mutate the       |
+ * |                                    | probability to get an improoved     |
+ * |                                    | individuals should be around 1/5    |
+ * |                                    |                                     |
+ * | char continue_ev(Individual *ivs,  | takes an pointer to the current     |
+ * |                  void *opts)       | Individuals and should return 0 if  |
+ * |                                    | the calculaten should stop and 1 if |
+ * |                                    | the calculaten should continue      |
+ * |                                    |                                     |
+ * | int population_size                | Number of Individuals in your       |
+ * |                                    | Evolution population (the real      |
+ * |                                    | number of Individuals hold in       |
+ * |                                    | memory can be differ)               |
+ * |                                    |                                     |
+ * | double generation_limit            | the maximum amoung of generation to |
+ * |                                    | calculate                           |
+ * |                                    |                                     |
+ * | double mutation_propability        | the propability for one single      |
+ * |                                    | Individual to mutate during an      |
+ * |                                    | generation change                   |
+ * |                                    |                                     |
+ * | double death_percentage            | percent of Individuals dying during |
+ * |                                    | an generation change. Also from     |
+ * |                                    | (1 - death_percentage) percent of   |
+ * |                                    | the best Individuals the next       |
+ * |                                    | generation will be calculated       |
+ * |                                    |                                     |
+ * | void **opts                        | threadwide opts given as opts to    |
+ * |                                    | the above function, thread[0] gets  |
+ * |                                    | opts[0] usw                         |
+ * |                                    |                                     |
+ * | int num_threads                    | number of threads to use            |
+ * |                                    |                                     |
+ * | uint16_t flags                     | flags are discussed below           |
+ * +------------------------------------+-------------------------------------+
+ *
+ * Note: - The void pointer to individuals are not pointer to an Individual 
+ *         struct, they are the individual element of the Individual struct.
+ *       - The last parameter of each function (opts) is an void pointer to 
+ *         optional arguments of your choice
+ *
+ * flags can be:
+ *
+ *    EV_UREC / EV_USE_RECOMBINATION
+ *    EV_UMUT / EV_USE_MUTATION
+ *    EV_AMUT / EV_ALWAYS_MUTATE
+ *    EV_KEEP / EV_KEEP_LAST_GENERATION
+ *    EV_ABRT / EV_USE_ABORT_REQUIREMENT
+ *    EV_SMAX / EV_SORT_MAX
+ *    EV_SMIN / EV_SORT_MIN
+ *    EV_VEB0 / EV_VERBOSE_QUIET
+ *    EV_VER1 / EV_VERBOSE_ONELINE
+ *    EV_VER2 / EV_VERBOSE_HIGH
+ *    EV_VER3 / EV_VERBOSE_ULTRA
+ *
+ * To all of the combinations below an EV_SMIN / EV_SMAX can be added
+ * standart is EV_SMIN
+ *
+ * Also an verbosytiy level of:
+ *    EV_VERBOSE_QUIET    (EV_VEB0), 
+ *    EV_VERBOSE_ONELINE  (EV_VEB1)
+ *    EV_VERBOSE_HIGH     (EV_VEB2) 
+ *    EV_VERBOSE_ULTRA    (EV_VEB3)
+ * can be added, standart is EV_VERBOSE_QUIET
+ *
+ * +---------------------------------+----------------------------------------+
+ * | Flag combination                | descrion                               |
+ * +---------------------------------+----------------------------------------+
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP | Recombinate and always mutate          |
+ * | |EV_ABRT                        | individuals, keep last generation,     |
+ * |                                 | and use abort requirement function     |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT | Onley mutate individual keep last      |
+ * |                                 | generation and use abort requirement   |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT | Recombinate and maybe mutate           |
+ * |                                 | individuals (depending on a given      |
+ * |                                 | probability) keep last generation and  |
+ * |                                 | use abort requirement function         |
+ * |                                 |                                        |
+ * | EV_UREC|EV_KEEP|EV_ABRT         | Recombinate individuals, keep last     |
+ * |                                 | generation and use abort requirement   |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT | Recombinate and always mutate          |
+ * |                                 | individuals, disgard last generation.  |
+ * |                                 | and use abort requirement function     |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT|EV_ABRT         | Onely mutate individuals, disgard last |
+ * |                                 | generation, and use abort requirement  |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_ABRT         | Recombinate and maybe mutate           |
+ * |                                 | individuals (depending on a given      |
+ * |                                 | probability), disgard last generation  |
+ * |                                 | and use abort requirement function     |
+ * |                                 |                                        |
+ * | EV_UREC|EV_ABRT                 | Recombinate individuals, disgard last  |
+ * |                                 | generation and use abort requirement   |
+ * |                                 | function                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP | Recombinate and always mutate          |
+ * |                                 | individuals, keep last generation, and |
+ * |                                 | calc until generation limit is         |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT|EV_KEEP         | Onely mutate individuals, keep last    |
+ * |                                 | generation and calc until generation   |
+ * |                                 | limit is reatched                      |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_KEEP         | Recombinate and maybe mutate           |
+ * |                                 | individuals, keep last generation and  |
+ * |                                 | calc until generation limit is         |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_KEEP                 | Recombinate individuals, keep last     |
+ * |                                 | generation and calc until generation   |
+ * |                                 | limit is reatched                      |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT|EV_AMUT         | Recombinate and always mutate          |
+ * |                                 | individuals, disgard last generation   |
+ * |                                 | and calc until generation imit is      |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UMUT|EV_AMUT                 | Recombinate and always mutate          |
+ * |                                 | Individuals disgard old generation and |
+ * |                                 | calc until generation limit is         |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UREC|EV_UMUT                 | Recombinate and maybe mutate           |
+ * |                                 | Individual (depending on a given       |
+ * |                                 | probability) disgard old generation    |
+ * |                                 | and calc until generation limit is     |
+ * |                                 | reatched                               |
+ * |                                 |                                        |
+ * | EV_UREC                         | Recombinate Individual onley disgard   |
+ * |                                 | old generation and calc until          |
+ * |                                 | generation limit is reatched           |
+ * +---------------------------------+----------------------------------------+
  */
 typedef struct {
   void     *(*init_individual) (void *);
-  void     (*clone_individual) (void *, void *, void *);
+  void     (*clone_individual) (void *, 
+                                void *, 
+                                void *);
   void     (*free_individual) (void *, void *);
   void     (*mutate) (Individual *, void *);
   int64_t  (*fitness) (Individual *, void *);
-  void     (*recombinate) (Individual *, Individual *, Individual *, void *);
+  void     (*recombinate) (Individual *, 
+                           Individual *, 
+                           Individual *, 
+                           void *);
   char     (*continue_ev) (Individual *, void *);
   int      population_size;
   int      generation_limit;
@@ -103,44 +278,80 @@ typedef struct {
 /**
  * The Evolution struct
  *
- * for detailed information about the function-pointers 
- * have a lock at the init function
+ * the most values ar already discussed: see EvInitArgs
+ *
+ * the other balues are:
+ *
+ * +------------------------------------+-------------------------------------+
+ * | Value                              | describtion                         |
+ * +------------------------------------+-------------------------------------+
+ * | Individual **population            | the population of Individuals only  |
+ * |                                    | pointers for faster sorting         |
+ * |                                    |                                     |
+ * | Individual * individuals           | the Individuals                     |
+ * |                                    |                                     |
+ * | char use_recombination             | indicates wether to recombinate the |
+ * |                                    | Individuals during a generation     |
+ * |                                    | change or not                       |           
+ * |                                    |                                     |
+ * | char use_muttation                 | indicates wether to mutate the      |
+ * |                                    | Individuals during a generation     |
+ * |                                    | change or not                       |           
+ * |                                    |                                     |
+ * | char always_mutate                 | indicates wether to mutate every    |
+ * |                                    | Individuals during every generation |
+ * |                                    |                                     |
+ * | char keep_last_generation          | indicates wether to keep or discard |
+ * |                                    | the last generation during a change |
+ * |                                    |                                     |
+ * | char use_abort_requirement         | indicates wether to use continue_ev |
+ * |                                    | or to calculate until generation    |
+ * |                                    | limit is reatched                   | 
+ * |                                    |                                     |
+ * | char sort_max                      | indicates wether to sort            |
+ * |                                    | Individuals by max or min fitness   |
+ * |                                    |                                     |
+ * | uint16_t verbose                   | the verbosity level, see flags      |
+ * |                                    | describtion at EvInitArgs           |
+ * |                                    |                                     |
+ * | int min_quicksort                  | min array length to change from     |
+ * |                                    | quick to insertion sort             |
+ * +------------------------------------+-------------------------------------+
+ * 
  */
 struct Evolution {
-  Individual **population;                  /* Population of Individuals     */
-                                            /* only pointers for faster      */
-                                            /* sorting                       */
-  Individual *individuals;                  /* The Individuals               */
-  void   *(*init_individual) (void *);      /* function to initialzes        */
-                                            /* an Individual                 */
-  void   (*clone_individual) (void *,       /* function clones an individual */
-                              void *,       /* first Individual is           */
-                              void *);      /* destination second is source  */
-  void   (*free_individual) (void *,        /* function to free (kill) an    */
-                             void *);       /* Individual                    */  
-  int    population_size;                   /* Population size               */
-  void   (*recombinate) (Individual *,      /* recombination function(src1,  */
-                         Individual *,      /*                        src2,  */
-                         Individual *,      /*                        dst)   */  
-                         void *);           /*                               */
-  void   (*mutate) (Individual *, void *);  /* mutation function             */
-  int64_t (*fitness) (Individual *, void *); /* fittnes function */
-  char   use_recombination;                  /* indicates wether to use recombination or not */
-  char   use_muttation;                     /* indicates wether to use mutation or not */
-  char   always_mutate;                     /* indicates wheter to always mutate or use probability */
-  char   keep_last_generation;              /* indicates wheter to disgard last generation or not */
-  double mutation_propability;              /* the probability of an Individual to mutate */
-  double death_percentage;                  /* the percent of Individual that die during an generation change */
-  char   (*continue_ev) (Individual *, 
-                         void *);            /* abort requirement function should return 0 to abort 1 to continue */
-  char   use_abort_requirement;               /* if not true calculation will go on until generation limit es reatched */
-  int    generation_limit;                     /* maximum of generations to calculate (even if abort requirement is used) */
-  char   sort_max;                            /* if the individuals should be sorted by max or min fittnes */
-  void   **opts;                              /* pointer to aditional opts which is given to each function */
-  short  verbose;                            /* the verbosity level */
-  int    min_quicksort;                     /* min array length to change    *
-                                             * sorting from qick- to         *
-                                             * insertionsort                 */            
+  void     *(*init_individual) (void *);
+  void     (*clone_individual) (void *, 
+                                void *, 
+                                void *);
+  void     (*free_individual) (void *, void *);
+  void     (*mutate) (Individual *, void *);
+  int64_t  (*fitness) (Individual *, void *);
+  void     (*recombinate) (Individual *, 
+                           Individual *, 
+                           Individual *, 
+                           void *);
+  char     (*continue_ev) (Individual *, void *);
+  int      population_size;
+  int      generation_limit;
+  double   mutation_propability;
+  double   death_percentage;
+  void     **opts;
+  int      num_threads; 
+  Individual **population;               
+                                         
+                                         
+  Individual *individuals;               
+  char   use_recombination;              
+  char   use_muttation;                  
+  char   always_mutate;                  
+  char   keep_last_generation;           
+  char   use_abort_requirement;          
+  char   sort_max;                     
+  uint16_t  verbose;                  
+  int    min_quicksort;              
+                                    
+                                   
   struct {
     int i, start, end, num_threads,          // TODO explain, and my be better names 
         mutate, generations_progressed;
