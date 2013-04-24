@@ -20,19 +20,11 @@
  * |                                    |                                     |
  * | int generations_progressed         | indicates how many generations are  |
  * |                                    | are already processed               |
- * |                                    |                                     |
- * | int deaths                         | number of individuals die during an |
- * |                                    | gerenation change                   |
- * |                                    |                                     |
- * | int survives                       | number of individuals survive       |
- * |                                    | during an gerenation change         |
  * +------------------------------------+-------------------------------------+
  */
 typedef struct {
  int improovs; 
  int generations_progressed;
- int deaths;
- int survives;
 } EvolutionInfo;
 
 /**
@@ -326,6 +318,12 @@ typedef const struct {
  * |                                    | or to calculate until generation    |
  * |                                    | limit is reatched                   | 
  * |                                    |                                     |
+ * | int deaths                         | number of individuals die during an |
+ * |                                    | gerenation change                   |
+ * |                                    |                                     |
+ * | int survivors                      | number of individuals survive       |
+ * |                                    | during an gerenation change         |
+ * |                                    |                                     |
  * | char sort_max                      | indicates wether to sort            |
  * |                                    | Individuals by max or min fitness   |
  * |                                    |                                     |
@@ -354,6 +352,12 @@ typedef const struct {
  * | TClient *clients                   | Thread Clients which handle the     |
  * |                                    | threads used to calculate parallel, |
  * |                                    | saving syscalls by reusing threads  |
+ * |                                    |                                     |
+ * | EvThreadArgs thread_args           | different argments for each thread  |
+ * |                                    | containing an thread specific index |
+ * |                                    |                                     |
+ * | EvolutionInfo info                 | additional information during an    |
+ * |                                    | evolution
  * +------------------------------------+-------------------------------------+
  * 
  * Note: many values are const like opts (an const pointer to an array of
@@ -383,6 +387,8 @@ struct Evolution {
   const char     always_mutate;                  
   const char     keep_last_generation;           
   const char     use_abort_requirement;          
+  const int      deaths;
+  const int      survivors;
   const char     sort_max;                     
   const uint16_t verbose;                  
   const int      min_quicksort;              
@@ -394,7 +400,7 @@ struct Evolution {
   const int      i_mut_propability;
   TClient *const thread_clients;
   EvThreadArgs   *thread_args;
-  EvolutionInfo info;
+  EvolutionInfo  info;
 };
 
 
