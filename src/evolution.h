@@ -10,15 +10,26 @@
 
 /**
  * Structur holding aditional information during an evolution
+ *
+ * +------------------------------------+-------------------------------------+
+ * | Value                              | describtion                         |
+ * +------------------------------------+-------------------------------------+
+ * | int improovs                       | indecates how many Individual where |
+ * |                                    | better then their predecessors      |
+ * |                                    | during the last generation          |
+ * |                                    |                                     |
+ * | int generations_progressed         | indicates how many generations are  |
+ * |                                    | are already processed               |
+ * +------------------------------------+-------------------------------------+
  */
 typedef struct {
  int improovs; 
+ int generations_progressed;
 } EvolutionInfo;
 
 /**
  * Some standard values
  */
-#define EV_MUT_ACCURACY 10000
 #define EV_QICKSORT_MIN 20
 
 /**
@@ -236,9 +247,7 @@ typedef struct {
  */
 typedef struct {
   void     *(*init_individual) (void *);
-  void     (*clone_individual) (void *, 
-                                void *, 
-                                void *);
+  void     (*clone_individual) (void *, void *, void *);
   void     (*free_individual) (void *, void *);
   void     (*mutate) (Individual *, void *);
   int64_t  (*fitness) (Individual *, void *);
@@ -267,13 +276,14 @@ char void_ptr_smaler(void *a, void *b);
 char void_ptr_equal(void *a, void *b);
 
 /**
- * Struct holding information for threads
+ * Struct holding information for the thread clients
  */
 typedef struct Evolution Evolution;
-typedef struct {
-  Evolution *ev;
-  int index;
-} EvolutionThread;
+typedef const struct {
+  Evolution *ev;          /* pointer to the current Evolution struct */
+  int index;              /* index of the current working thread     */
+  // TODO add the opt ptr for the current index (at init) so we can scip the opt[index]
+} EvThreadArgs;
 
 /**
  * The Evolution struct
@@ -316,50 +326,64 @@ typedef struct {
  * |                                    |                                     |
  * | int min_quicksort                  | min array length to change from     |
  * |                                    | quick to insertion sort             |
+ * |                                    |                                     |
+ * | int parallel_index                 | used to syncornize the parallel     |
+ * |                                    | access of the individuals during    |
+ * |                                    | initializing, recombination usw.    |
+ * |                                    |                                     |
+ * | int parallel_start                 | indicates where to start parallel   |
+ * |                                    | calculation (array index)           |
+ * |                                    |                                     |
+ * | int parallel_end                   | indicates where to end parallel     |
+ * |                                    | calculation (array index)           |
+ * |                                    |                                     |
+ * | int i_mut_propability              | because int rand() is faster than   |
+ * |                                    | double rand() we transfer           |
+ * |                                    | mutation_propability with RAND_MAX  |
+ * |                                    | into i_mut_propability to faster    |
+ * |                                    | calculate wether to mutate or not   |
+ * |                                    |                                     |
+ * | TClient *clients                   | Thread Clients which handle the     |
+ * |                                    | threads used to calculate parallel, |
+ * |                                    | saving syscalls by reusing threads  |
  * +------------------------------------+-------------------------------------+
  * 
  */
 struct Evolution {
-  void     *(*init_individual) (void *);
-  void     (*clone_individual) (void *, 
-                                void *, 
-                                void *);
-  void     (*free_individual) (void *, void *);
-  void     (*mutate) (Individual *, void *);
-  int64_t  (*fitness) (Individual *, void *);
-  void     (*recombinate) (Individual *, 
-                           Individual *, 
-                           Individual *, 
-                           void *);
-  char     (*continue_ev) (Individual *, void *);
-  int      population_size;
-  int      generation_limit;
-  double   mutation_propability;
-  double   death_percentage;
-  void     **opts;
-  int      num_threads; 
-  Individual **population;               
-                                         
-                                         
-  Individual *individuals;               
-  char   use_recombination;              
-  char   use_muttation;                  
-  char   always_mutate;                  
-  char   keep_last_generation;           
-  char   use_abort_requirement;          
-  char   sort_max;                     
-  uint16_t  verbose;                  
-  int    min_quicksort;              
-                                    
-                                   
-  struct {
-    int parallel_index, start, end, num_threads,          // TODO explain, and my be better names 
-        mutate, generations_progressed;
-    TClient *thread_clients;
-    EvolutionThread *ev_threads;
-    char last_improovs_str[25];
-    EvolutionInfo info;
-  } paralell;
+  Individual     **population;               
+  Individual     *individuals;               
+  void           *(*const init_individual) (void *);
+  void           (*const clone_individual) (void *, void *, void *);
+  void           (*const free_individual) (void *, void *);
+  void           (*const mutate) (Individual *, void *);
+  int64_t        (*const fitness) (Individual *, void *);
+  void           (*const recombinate) (Individual *, 
+                                       Individual *, 
+                                       Individual *, 
+                                       void *);
+  char           (*const continue_ev) (Individual *, void *);  // TODO gets the current Evolution as arg
+  const int      population_size;
+  const int      generation_limit;
+  const double   mutation_propability;
+  const double   death_percentage;
+  void *const    *const opts;  /* const pointer to an array of const void pointers */
+  const int      num_threads; 
+  const char     use_recombination;              
+  const char     use_muttation;                  
+  const char     always_mutate;                  
+  const char     keep_last_generation;           
+  const char     use_abort_requirement;          
+  const char     sort_max;                     
+  const uint16_t verbose;                  
+  const int      min_quicksort;              
+  int            parallel_index;
+  int            parallel_start;
+  int            parallel_end; // TODO explain, and my be better names 
+  const int      i_mut_propability;
+  TClient *const thread_clients;
+  EvThreadArgs   *ev_threads;
+  char last_improovs_str[25];
+  EvolutionInfo info;
 };
 
 

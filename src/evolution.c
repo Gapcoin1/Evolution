@@ -29,7 +29,7 @@ static inline char ev_equal(Individual *a, Individual *b) {
 /**
  * Macro for sorting the Evolution by fittnes 
  * using Macro based version onely because
- * paralell version will propably need more then
+ * parallel version will propably need more then
  * 16 Corse to be efficient
  */
 #define EV_SELECTION(EV)                                      \
@@ -223,37 +223,45 @@ Evolution *new_evolution(EvInitArgs *args) {
   int mul = ev->keep_last_generation ? 1 : 2;
   size_t population_space       = sizeof(Individual *) * args->population_size * mul;
   size_t individuals_space      = sizeof(Individual) * args->population_size * mul;
-                                
+
   ev->population                = (Individual **) malloc(population_space);
   ev->individuals               = (Individual *) malloc(individuals_space);
-  ev->init_individual           = args->init_individual;
-  ev->clone_individual          = args->clone_individual;
-  ev->free_individual           = args->free_individual;
-  ev->mutate                    = args->mutate;
-  ev->fitness                   = args->fitness;
-  ev->recombinate               = args->recombinate;
-  ev->continue_ev               = args->continue_ev;
-  ev->population_size           = args->population_size;
-  ev->generation_limit          = args->generation_limit;
-  ev->mutation_propability      = args->mutation_propability;
-  ev->death_percentage          = args->death_percentage;
-  ev->opts                      = args->opts;
-  ev->paralell.num_threads      = args->num_threads;
-  ev->paralell.parallel_index                = 0;
-  ev->paralell.info.improovs    = 0;
-  ev->paralell.thread_clients   = malloc(sizeof(TClient) * args->num_threads);
-  ev->paralell.ev_threads       = malloc(sizeof(EvolutionThread) 
+  /**
+   * it's a bit trikey to initilaize a const value in an 
+   * dynmic allocated struct and it gets even harder vor function pointer
+   * we have to get the address where the function pointer is stored and 
+   * cast this adress to an pointer of that function pointer without const
+   * and dereference this pointer (of an function pointer) and set its content
+   * to the given function pointer
+   */
+  *(void *(**)(void *)) &ev->init_individual           = args->init_individual;
+  *(void (**)(void *, void *, void *)) &ev->clone_individual          = args->clone_individual;
+  *(void (**)(void *, void *)) &ev->free_individual           = args->free_individual;
+  *(void (**)(Individual *, void *)) &ev->mutate                    = args->mutate;
+  *(int64_t (**)(Individual *, void *)) &ev->fitness                   = args->fitness;
+  *(void (**)(Individual *, Individual *, Individual *, void *)) &ev->recombinate               = args->recombinate;
+  *(char (**) (Individual *, void *)) &ev->continue_ev               = args->continue_ev;
+  *(int *) &ev->population_size = args->population_size;
+  *(int *) &ev->generation_limit = args->generation_limit;
+  *(double *) &ev->mutation_propability      = args->mutation_propability;
+  *(double *) &ev->death_percentage          = args->death_percentage;
+  *(void ***) &ev->opts                      = args->opts;
+  *(int *) &ev->num_threads      = args->num_threads;
+  ev->parallel_index                = 0;
+  ev->info.improovs    = 0;
+  *(TClient **) &ev->thread_clients   = malloc(sizeof(TClient) * args->num_threads);
+  ev->ev_threads       = malloc(sizeof(EvThreadArgs) 
                                          * args->num_threads);
-  ev->paralell.mutate           = (int) ((double) EV_MUT_ACCURACY 
+  *(int *) &ev->i_mut_propability           = (int) ((double) RAND_MAX 
                                          * ev->mutation_propability);
-  ev->use_recombination          = args->flags & EV_USE_RECOMBINATION;
-  ev->use_muttation             = args->flags & EV_USE_MUTATION;
-  ev->always_mutate             = args->flags & EV_ALWAYS_MUTATE;
-  ev->keep_last_generation      = args->flags & EV_KEEP_LAST_GENERATION;
-  ev->use_abort_requirement     = args->flags & EV_USE_ABORT_REQUIREMENT;
-  ev->sort_max                  = args->flags & EV_SORT_MAX;
-  ev->verbose                   = args->flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
-  ev->min_quicksort             = EV_QICKSORT_MIN;
+  *(char *) &ev->use_recombination          = args->flags & EV_USE_RECOMBINATION;
+  *(char *) &ev->use_muttation             = args->flags & EV_USE_MUTATION;
+  *(char *) &ev->always_mutate             = args->flags & EV_ALWAYS_MUTATE;
+  *(char *) &ev->keep_last_generation      = args->flags & EV_KEEP_LAST_GENERATION;
+  *(char *) &ev->use_abort_requirement     = args->flags & EV_USE_ABORT_REQUIREMENT;
+  *(char *) &ev->sort_max                  = args->flags & EV_SORT_MAX;
+  *(uint64_t *) &ev->verbose                   = args->flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
+  *(int *) &ev->min_quicksort             = EV_QICKSORT_MIN;
 
   /**
    * init thread lib
@@ -261,21 +269,21 @@ Evolution *new_evolution(EvInitArgs *args) {
    */
   int i;
   for (i = 0; i < args->num_threads; i++)
-    init_thread_client(&ev->paralell.thread_clients[i]);
+    init_thread_client(&ev->thread_clients[i]);
 
 
-  ev->paralell.parallel_index = args->population_size * mul;
+  ev->parallel_index = args->population_size * mul;
 
   /* add work for the clients */
   for (i = 0; i < args->num_threads; i++) {
-    ev->paralell.ev_threads[i].ev = ev;
-    ev->paralell.ev_threads[i].index = i;
-    tc_add_func(&ev->paralell.thread_clients[i], threadable_init_individual, (void *) &ev->paralell.ev_threads[i]);
+    *(Evolution **) &ev->ev_threads[i].ev = ev;
+    *(int *) &ev->ev_threads[i].index = i;
+    tc_add_func(&ev->thread_clients[i], threadable_init_individual, (void *) &ev->ev_threads[i]);
   }
 
   // wait for threads
   for (i = 0; i < args->num_threads; i++) {
-    tc_join(&ev->paralell.thread_clients[i]);
+    tc_join(&ev->thread_clients[i]);
   }
 
   /**
@@ -379,18 +387,18 @@ Individual best_evolution(EvInitArgs *args) {
  * Parallel init_individual function
  */
 void *threadable_init_individual(void *arg) {
-  EvolutionThread *evt = arg;
+  EvThreadArgs *evt = arg;
   Evolution *ev = evt->ev;
   int i;
 
   while (1) {
      
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.parallel_index <= 0)
+      if (ev->parallel_index <= 0)
         break;
  
-      ev->paralell.parallel_index--;
-      i = ev->paralell.parallel_index;
+      ev->parallel_index--;
+      i = ev->parallel_index;
     pthread_mutex_unlock(&ev_mutex);
  
     ev->population[i] = ev->individuals + i;
@@ -424,7 +432,7 @@ Individual *evolute(Evolution *ev) {
   int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
   int survives = ev->population_size - deaths;
   Individual *tmp_iv;
-  sprintf(ev->paralell.last_improovs_str, "Not knowen");
+  sprintf(ev->last_improovs_str, "Not knowen");
 
   /**
    * Generation loop
@@ -435,8 +443,8 @@ Individual *evolute(Evolution *ev) {
   for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
                 || (ev->use_abort_requirement && ev->continue_ev(ev->individuals, ev->opts[0]))); i++) {
     
-    ev->paralell.info.improovs = 0;
-    ev->paralell.generations_progressed = i;
+    ev->info.improovs = 0;
+    ev->info.generations_progressed = i;
   
     /**
      * If we keep the last generation, we can recombinate in place
@@ -447,17 +455,17 @@ Individual *evolute(Evolution *ev) {
 
 
     if (ev->use_recombination) {
-      ev->paralell.start = ev->paralell.parallel_index = start;
-      ev->paralell.end = end;
+      ev->parallel_start = ev->parallel_index = start;
+      ev->parallel_end = end;
 
       // create threads
-      for (j = 0; j < ev->paralell.num_threads; j++) {
-        tc_add_func(&ev->paralell.thread_clients[j], threadable_recombinate, (void *) &ev->paralell.ev_threads[j]);
+      for (j = 0; j < ev->num_threads; j++) {
+        tc_add_func(&ev->thread_clients[j], threadable_recombinate, (void *) &ev->ev_threads[j]);
       }
 
       // wait untill threads finished
-      for (j = 0; j < ev->paralell.num_threads; j++) {
-        tc_join(&ev->paralell.thread_clients[j]);
+      for (j = 0; j < ev->num_threads; j++) {
+        tc_join(&ev->thread_clients[j]);
       }
 
     // copy and mutate individuals
@@ -465,33 +473,33 @@ Individual *evolute(Evolution *ev) {
       
       // if deaths == survives, make sure that all survivers are being copyed and mutated
       if (start * 2 == end) {
-        ev->paralell.parallel_index = 0;
-        ev->paralell.start = start;
-        ev->paralell.end = end;
+        ev->parallel_index = 0;
+        ev->parallel_start = start;
+        ev->parallel_end = end;
 
         // create threads
-        for (j = 0; j < ev->paralell.num_threads; j++) {
-          tc_add_func(&ev->paralell.thread_clients[j], threadable_mutation_onely_1half, (void *) &ev->paralell.ev_threads[j]);
+        for (j = 0; j < ev->num_threads; j++) {
+          tc_add_func(&ev->thread_clients[j], threadable_mutation_onely_1half, (void *) &ev->ev_threads[j]);
         }
        
         // wait untill threads finished
-        for (j = 0; j < ev->paralell.num_threads; j++) {
-          tc_join(&ev->paralell.thread_clients[j]);
+        for (j = 0; j < ev->num_threads; j++) {
+          tc_join(&ev->thread_clients[j]);
         }
 
       // else choose random survivers to mutate
       } else {
-        ev->paralell.start = ev->paralell.parallel_index = start;
-        ev->paralell.end = end;
+        ev->parallel_start = ev->parallel_index = start;
+        ev->parallel_end = end;
 
         // create threads
-        for (j = 0; j < ev->paralell.num_threads; j++) {
-          tc_add_func(&ev->paralell.thread_clients[j], threadable_mutation_onely_rand, (void *) &ev->paralell.ev_threads[j]);
+        for (j = 0; j < ev->num_threads; j++) {
+          tc_add_func(&ev->thread_clients[j], threadable_mutation_onely_rand, (void *) &ev->ev_threads[j]);
         }
        
         // wait untill threads finished
-        for (j = 0; j < ev->paralell.num_threads; j++) {
-          tc_join(&ev->paralell.thread_clients[j]);
+        for (j = 0; j < ev->num_threads; j++) {
+          tc_join(&ev->thread_clients[j]);
         }
       }
     }
@@ -517,11 +525,11 @@ Individual *evolute(Evolution *ev) {
     EV_SELECTION(ev);
 
     if (ev->verbose >= EV_VERBOSE_ONELINE)
-      sprintf(ev->paralell.last_improovs_str, "%.5f", (ev->paralell.info.improovs / (double) deaths) * 100.0);
+      sprintf(ev->last_improovs_str, "%.5f", (ev->info.improovs / (double) deaths) * 100.0);
 
     if (ev->verbose >= EV_VERBOSE_HIGH) {
       printf("improovs: %10d -> %9s%%      best fitness: %10li                                                         \n", 
-                ev->paralell.info.improovs, ev->paralell.last_improovs_str, ev->population[0]->fitness);
+                ev->info.improovs, ev->last_improovs_str, ev->population[0]->fitness);
     }
   }
 
@@ -537,23 +545,23 @@ Individual *evolute(Evolution *ev) {
  * Parallel recombinate
  */
 void *threadable_recombinate(void *arg) {
-  EvolutionThread *evt = arg;
-  Evolution *ev = arg;
+  EvThreadArgs *evt = arg;
+  Evolution *ev = evt->ev;
   int j, rand1, rand2;
 
   while (1) {
 
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.parallel_index >= ev->paralell.end)
+      if (ev->parallel_index >= ev->parallel_end)
         break;
       
-      j = ev->paralell.parallel_index;
-      ev->paralell.parallel_index++;
+      j = ev->parallel_index;
+      ev->parallel_index++;
     pthread_mutex_unlock(&ev_mutex);
 
     // from 2 Individuals of the untouched part we calculate an new one
-    rand2 = rand1 = rand() % ev->paralell.start;
-    while (rand1 == rand2) rand2 = rand() % ev->paralell.start; // TODO prevent endless loop if one one idividual survives
+    rand2 = rand1 = rand() % ev->parallel_start;
+    while (rand1 == rand2) rand2 = rand() % ev->parallel_start; // TODO prevent endless loop if one one idividual survives
     
     // recombinate individuals
     ev->recombinate(ev->population[rand1], ev->population[rand2], ev->population[j], ev->opts[evt->index]);
@@ -563,8 +571,7 @@ void *threadable_recombinate(void *arg) {
       if (ev->always_mutate)
         ev->mutate(ev->population[j], ev->opts[evt->index]);
       else {
-        rand1 = rand() % EV_MUT_ACCURACY;
-        if (rand1 <= ev->paralell.mutate)
+        if (rand() <= ev->i_mut_propability)
           ev->mutate(ev->population[j], ev->opts[evt->index]);
       }
     }
@@ -579,7 +586,7 @@ void *threadable_recombinate(void *arg) {
       if (ev->population[j]->fitness > ev->population[rand1]->fitness
            && ev->population[j]->fitness > ev->population[rand2]->fitness) {
         pthread_mutex_lock(&ev_mutex);
-          ev->paralell.info.improovs++;
+          ev->info.improovs++;
         pthread_mutex_unlock(&ev_mutex);
       }
 
@@ -587,7 +594,7 @@ void *threadable_recombinate(void *arg) {
       if (ev->population[j]->fitness < ev->population[rand1]->fitness
            && ev->population[j]->fitness < ev->population[rand2]->fitness) {
         pthread_mutex_lock(&ev_mutex);
-          ev->paralell.info.improovs++;
+          ev->info.improovs++;
         pthread_mutex_unlock(&ev_mutex);
       }
     }
@@ -596,13 +603,13 @@ void *threadable_recombinate(void *arg) {
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", 
-                ev->generation_limit - ev->paralell.generations_progressed, ev->paralell.end - j, ev->paralell.last_improovs_str);
+                ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
     if (ev->verbose >= EV_VERBOSE_ULTRA) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\n", 
-                ev->generation_limit - ev->paralell.generations_progressed, ev->paralell.end - j, ev->paralell.last_improovs_str);
+                ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
   }
@@ -618,40 +625,40 @@ void *threadable_recombinate(void *arg) {
  */
 void *threadable_mutation_onely_1half(void *arg) {
 
-  EvolutionThread *evt = arg;
-  Evolution *ev = arg;
+  EvThreadArgs *evt = arg;
+  Evolution *ev = evt->ev;
   int j;
 
   while (1) {
 
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.parallel_index + ev->paralell.start >= ev->paralell.end)
+      if (ev->parallel_index + ev->parallel_start >= ev->parallel_end)
         break;
       
-      j = ev->paralell.parallel_index;
-      ev->paralell.parallel_index++;
+      j = ev->parallel_index;
+      ev->parallel_index++;
     pthread_mutex_unlock(&ev_mutex);
 
-    ev->clone_individual(ev->population[j + ev->paralell.start]->individual, ev->population[j]->individual, ev->opts[evt->index]);
-    ev->mutate(ev->population[j + ev->paralell.start], ev->opts[evt->index]);
+    ev->clone_individual(ev->population[j + ev->parallel_start]->individual, ev->population[j]->individual, ev->opts[evt->index]);
+    ev->mutate(ev->population[j + ev->parallel_start], ev->opts[evt->index]);
 
     // calculate the fittnes for the new individual
-    ev->population[j + ev->paralell.start]->fitness = ev->fitness(ev->population[j + ev->paralell.start], ev->opts[evt->index]);
+    ev->population[j + ev->parallel_start]->fitness = ev->fitness(ev->population[j + ev->parallel_start], ev->opts[evt->index]);
     
     /**
      * store if the new individual is better as the old one
      */
     if (ev->sort_max) {
-      if (ev->population[j + ev->paralell.start]->fitness > ev->population[j]->fitness) {
+      if (ev->population[j + ev->parallel_start]->fitness > ev->population[j]->fitness) {
         pthread_mutex_lock(&ev_mutex);
-          ev->paralell.info.improovs++;
+          ev->info.improovs++;
         pthread_mutex_unlock(&ev_mutex);
       }
 
     } else {
-      if (ev->population[j + ev->paralell.start]->fitness < ev->population[j]->fitness) {
+      if (ev->population[j + ev->parallel_start]->fitness < ev->population[j]->fitness) {
         pthread_mutex_lock(&ev_mutex);
-          ev->paralell.info.improovs++;
+          ev->info.improovs++;
         pthread_mutex_unlock(&ev_mutex);
       }
     }
@@ -660,13 +667,13 @@ void *threadable_mutation_onely_1half(void *arg) {
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
-                                        ev->generation_limit - ev->paralell.generations_progressed, ev->paralell.start - j, ev->paralell.last_improovs_str);
+                                        ev->generation_limit - ev->info.generations_progressed, ev->parallel_start - j, ev->last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
     if (ev->verbose >= EV_VERBOSE_ULTRA) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\n", 
-                                        ev->generation_limit - ev->paralell.generations_progressed, ev->paralell.start - j, ev->paralell.last_improovs_str);
+                                        ev->generation_limit - ev->info.generations_progressed, ev->parallel_start - j, ev->last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
   }
@@ -682,21 +689,21 @@ void *threadable_mutation_onely_1half(void *arg) {
  */
 void *threadable_mutation_onely_rand(void *arg) {
 
-  EvolutionThread *evt = arg;
-  Evolution *ev = arg;
+  EvThreadArgs *evt = arg;
+  Evolution *ev = evt->ev;
   int j, rand1;
 
   while (1) {
 
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.parallel_index >= ev->paralell.end)
+      if (ev->parallel_index >= ev->parallel_end)
         break;
       
-      j = ev->paralell.parallel_index;
-      ev->paralell.parallel_index++;
+      j = ev->parallel_index;
+      ev->parallel_index++;
     pthread_mutex_unlock(&ev_mutex);
 
-    rand1 = rand() % ev->paralell.start;
+    rand1 = rand() % ev->parallel_start;
     ev->clone_individual(ev->population[j]->individual, ev->population[rand1]->individual, ev->opts[evt->index]);
     ev->mutate(ev->population[j], ev->opts[evt->index]);
 
@@ -709,14 +716,14 @@ void *threadable_mutation_onely_rand(void *arg) {
     if (ev->sort_max) {
       if (ev->population[j]->fitness > ev->population[rand1]->fitness) {
         pthread_mutex_lock(&ev_mutex);
-          ev->paralell.info.improovs++;
+          ev->info.improovs++;
         pthread_mutex_unlock(&ev_mutex);
       }
 
     } else {
       if (ev->population[j]->fitness < ev->population[rand1]->fitness) {
         pthread_mutex_lock(&ev_mutex);
-          ev->paralell.info.improovs++;
+          ev->info.improovs++;
         pthread_mutex_unlock(&ev_mutex);
       }
     }
@@ -725,13 +732,13 @@ void *threadable_mutation_onely_rand(void *arg) {
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", 
-               ev->generation_limit - ev->paralell.generations_progressed, ev->paralell.end - j, ev->paralell.last_improovs_str);
+               ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
     if (ev->verbose >= EV_VERBOSE_ULTRA) {
       pthread_mutex_lock(&ev_mutex);
         printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\n", 
-               ev->generation_limit - ev->paralell.generations_progressed, ev->paralell.end - j, ev->paralell.last_improovs_str);
+               ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
       pthread_mutex_unlock(&ev_mutex);
     }
   }
@@ -751,7 +758,7 @@ uint64_t ev_size(int population_size, int num_threads, int keep_last_generation,
   uint64_t mul = keep_last_generation ? 1 : 2;
 
   uint64_t size = (uint64_t) sizeof(Evolution);
-  size += (uint64_t) sizeof(EvolutionThread) * num_threads;
+  size += (uint64_t) sizeof(EvThreadArgs) * num_threads;
   size += (uint64_t) sizeof(pthread_t) * num_threads;
   size += sizeof_opt * num_threads;
   size += (uint64_t) sizeof(Individual *) * population_size * mul;
