@@ -239,7 +239,7 @@ Evolution *new_evolution(EvInitArgs *args) {
   ev->death_percentage          = args->death_percentage;
   ev->opts                      = args->opts;
   ev->paralell.num_threads      = args->num_threads;
-  ev->paralell.i                = 0;
+  ev->paralell.parallel_index                = 0;
   ev->paralell.info.improovs    = 0;
   ev->paralell.thread_clients   = malloc(sizeof(TClient) * args->num_threads);
   ev->paralell.ev_threads       = malloc(sizeof(EvolutionThread) 
@@ -264,7 +264,7 @@ Evolution *new_evolution(EvInitArgs *args) {
     init_thread_client(&ev->paralell.thread_clients[i]);
 
 
-  ev->paralell.i = args->population_size * mul;
+  ev->paralell.parallel_index = args->population_size * mul;
 
   /* add work for the clients */
   for (i = 0; i < args->num_threads; i++) {
@@ -386,16 +386,16 @@ void *threadable_init_individual(void *arg) {
   while (1) {
      
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.i <= 0)
+      if (ev->paralell.parallel_index <= 0)
         break;
  
-      ev->paralell.i--;
-      i = ev->paralell.i;
+      ev->paralell.parallel_index--;
+      i = ev->paralell.parallel_index;
     pthread_mutex_unlock(&ev_mutex);
  
     ev->population[i] = ev->individuals + i;
     ev->individuals[i].individual = ev->init_individual(ev->opts[evt->index]);
-    ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts[evt->index]);  // TODO USE the client wide opts from therad clients !!!!!!
+    ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts[evt->index]);  
  
     pthread_mutex_lock(&ev_mutex);
       if (ev->verbose >= EV_VERBOSE_ONELINE)
@@ -447,7 +447,7 @@ Individual *evolute(Evolution *ev) {
 
 
     if (ev->use_recombination) {
-      ev->paralell.start = ev->paralell.i = start;
+      ev->paralell.start = ev->paralell.parallel_index = start;
       ev->paralell.end = end;
 
       // create threads
@@ -465,7 +465,7 @@ Individual *evolute(Evolution *ev) {
       
       // if deaths == survives, make sure that all survivers are being copyed and mutated
       if (start * 2 == end) {
-        ev->paralell.i = 0;
+        ev->paralell.parallel_index = 0;
         ev->paralell.start = start;
         ev->paralell.end = end;
 
@@ -481,7 +481,7 @@ Individual *evolute(Evolution *ev) {
 
       // else choose random survivers to mutate
       } else {
-        ev->paralell.start = ev->paralell.i = start;
+        ev->paralell.start = ev->paralell.parallel_index = start;
         ev->paralell.end = end;
 
         // create threads
@@ -544,11 +544,11 @@ void *threadable_recombinate(void *arg) {
   while (1) {
 
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.i >= ev->paralell.end)
+      if (ev->paralell.parallel_index >= ev->paralell.end)
         break;
       
-      j = ev->paralell.i;
-      ev->paralell.i++;
+      j = ev->paralell.parallel_index;
+      ev->paralell.parallel_index++;
     pthread_mutex_unlock(&ev_mutex);
 
     // from 2 Individuals of the untouched part we calculate an new one
@@ -625,11 +625,11 @@ void *threadable_mutation_onely_1half(void *arg) {
   while (1) {
 
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.i + ev->paralell.start >= ev->paralell.end)
+      if (ev->paralell.parallel_index + ev->paralell.start >= ev->paralell.end)
         break;
       
-      j = ev->paralell.i;
-      ev->paralell.i++;
+      j = ev->paralell.parallel_index;
+      ev->paralell.parallel_index++;
     pthread_mutex_unlock(&ev_mutex);
 
     ev->clone_individual(ev->population[j + ev->paralell.start]->individual, ev->population[j]->individual, ev->opts[evt->index]);
@@ -689,11 +689,11 @@ void *threadable_mutation_onely_rand(void *arg) {
   while (1) {
 
     pthread_mutex_lock(&ev_mutex);
-      if (ev->paralell.i >= ev->paralell.end)
+      if (ev->paralell.parallel_index >= ev->paralell.end)
         break;
       
-      j = ev->paralell.i;
-      ev->paralell.i++;
+      j = ev->paralell.parallel_index;
+      ev->paralell.parallel_index++;
     pthread_mutex_unlock(&ev_mutex);
 
     rand1 = rand() % ev->paralell.start;

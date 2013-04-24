@@ -353,7 +353,7 @@ struct Evolution {
                                     
                                    
   struct {
-    int i, start, end, num_threads,          // TODO explain, and my be better names 
+    int parallel_index, start, end, num_threads,          // TODO explain, and my be better names 
         mutate, generations_progressed;
     TClient *thread_clients;
     EvolutionThread *ev_threads;
