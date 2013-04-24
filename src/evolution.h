@@ -348,6 +348,10 @@ typedef const struct {
  * |                                    | saving syscalls by reusing threads  |
  * +------------------------------------+-------------------------------------+
  * 
+ * Note: many values are const like opts (an const pointer to an array of
+ *       const void pointers), function pointers, but some not.
+ *       So this is a warning: do not change any value in this struct!! 
+ *       use the init function ;-)
  */
 struct Evolution {
   Individual     **population;               
@@ -355,19 +359,17 @@ struct Evolution {
   void           *(*const init_individual) (void *);
   void           (*const clone_individual) (void *, void *, void *);
   void           (*const free_individual) (void *, void *);
+  char           (*const continue_ev) (Individual *, void *);  // TODO gets the current Evolution as arg
   void           (*const mutate) (Individual *, void *);
   int64_t        (*const fitness) (Individual *, void *);
   void           (*const recombinate) (Individual *, 
                                        Individual *, 
                                        Individual *, 
                                        void *);
-  char           (*const continue_ev) (Individual *, void *);  // TODO gets the current Evolution as arg
   const int      population_size;
   const int      generation_limit;
   const double   mutation_propability;
   const double   death_percentage;
-  void *const    *const opts;  /* const pointer to an array of const void pointers */
-  const int      num_threads; 
   const char     use_recombination;              
   const char     use_muttation;                  
   const char     always_mutate;                  
@@ -376,12 +378,14 @@ struct Evolution {
   const char     sort_max;                     
   const uint16_t verbose;                  
   const int      min_quicksort;              
+  void *const    *const opts;   
+  const int      num_threads; 
   int            parallel_index;
   int            parallel_start;
-  int            parallel_end; // TODO explain, and my be better names 
+  int            parallel_end; 
   const int      i_mut_propability;
   TClient *const thread_clients;
-  EvThreadArgs   *ev_threads;
+  EvThreadArgs   *thread_args;
   char last_improovs_str[25];
   EvolutionInfo info;
 };

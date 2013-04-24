@@ -250,7 +250,7 @@ Evolution *new_evolution(EvInitArgs *args) {
   ev->parallel_index                = 0;
   ev->info.improovs    = 0;
   *(TClient **) &ev->thread_clients   = malloc(sizeof(TClient) * args->num_threads);
-  ev->ev_threads       = malloc(sizeof(EvThreadArgs) 
+  ev->thread_args       = malloc(sizeof(EvThreadArgs) 
                                          * args->num_threads);
   *(int *) &ev->i_mut_propability           = (int) ((double) RAND_MAX 
                                          * ev->mutation_propability);
@@ -276,9 +276,9 @@ Evolution *new_evolution(EvInitArgs *args) {
 
   /* add work for the clients */
   for (i = 0; i < args->num_threads; i++) {
-    *(Evolution **) &ev->ev_threads[i].ev = ev;
-    *(int *) &ev->ev_threads[i].index = i;
-    tc_add_func(&ev->thread_clients[i], threadable_init_individual, (void *) &ev->ev_threads[i]);
+    *(Evolution **) &ev->thread_args[i].ev = ev;
+    *(int *) &ev->thread_args[i].index = i;
+    tc_add_func(&ev->thread_clients[i], threadable_init_individual, (void *) &ev->thread_args[i]);
   }
 
   // wait for threads
@@ -460,7 +460,7 @@ Individual *evolute(Evolution *ev) {
 
       // create threads
       for (j = 0; j < ev->num_threads; j++) {
-        tc_add_func(&ev->thread_clients[j], threadable_recombinate, (void *) &ev->ev_threads[j]);
+        tc_add_func(&ev->thread_clients[j], threadable_recombinate, (void *) &ev->thread_args[j]);
       }
 
       // wait untill threads finished
@@ -479,7 +479,7 @@ Individual *evolute(Evolution *ev) {
 
         // create threads
         for (j = 0; j < ev->num_threads; j++) {
-          tc_add_func(&ev->thread_clients[j], threadable_mutation_onely_1half, (void *) &ev->ev_threads[j]);
+          tc_add_func(&ev->thread_clients[j], threadable_mutation_onely_1half, (void *) &ev->thread_args[j]);
         }
        
         // wait untill threads finished
@@ -494,7 +494,7 @@ Individual *evolute(Evolution *ev) {
 
         // create threads
         for (j = 0; j < ev->num_threads; j++) {
-          tc_add_func(&ev->thread_clients[j], threadable_mutation_onely_rand, (void *) &ev->ev_threads[j]);
+          tc_add_func(&ev->thread_clients[j], threadable_mutation_onely_rand, (void *) &ev->thread_args[j]);
         }
        
         // wait untill threads finished
