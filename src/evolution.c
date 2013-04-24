@@ -240,7 +240,7 @@ Evolution *new_evolution(EvInitArgs *args) {
   *(void (**)(Individual *, void *)) &ev->mutate                    = args->mutate;
   *(int64_t (**)(Individual *, void *)) &ev->fitness                   = args->fitness;
   *(void (**)(Individual *, Individual *, Individual *, void *)) &ev->recombinate               = args->recombinate;
-  *(char (**) (Individual *, void *)) &ev->continue_ev               = args->continue_ev;
+  *(char (**) (Evolution *const)) &ev->continue_ev               = args->continue_ev;
   *(int *) &ev->population_size = args->population_size;
   *(int *) &ev->generation_limit = args->generation_limit;
   *(double *) &ev->mutation_propability      = args->mutation_propability;
@@ -440,7 +440,7 @@ Individual *evolute(Evolution *ev) {
    */
   int i, j, start, end;
   for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
-                || (ev->use_abort_requirement && ev->continue_ev(ev->individuals, ev->opts[0]))); i++) {
+                || (ev->use_abort_requirement && ev->continue_ev(ev))); i++) {
     
     ev->info.improovs = 0;
     ev->info.generations_progressed = i;

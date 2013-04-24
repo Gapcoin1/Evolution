@@ -9,31 +9,19 @@
 #include "C-Utils/Thread-Clients/src/thread-client.h"
 
 /**
- * Structur holding aditional information during an evolution
- *
- * +------------------------------------+-------------------------------------+
- * | Value                              | describtion                         |
- * +------------------------------------+-------------------------------------+
- * | int improovs                       | indecates how many Individual where |
- * |                                    | better then their predecessors      |
- * |                                    | during the last generation          |
- * |                                    |                                     |
- * | int generations_progressed         | indicates how many generations are  |
- * |                                    | are already processed               |
- * +------------------------------------+-------------------------------------+
+ * Type definition for the Evolution struct
  */
-typedef struct {
- int improovs; 
- int generations_progressed;
-} EvolutionInfo;
+typedef struct Evolution Evolution;
 
 /**
- * Some standard values
+ * Some standard value for quickinsortion sort
  */
 #define EV_QICKSORT_MIN 20
 
 /**
- * Flags for the new_evolution function
+ * Flags for the EvInitArgs
+ *
+ * for description have a look at EvInitArgs
  */
 #define EV_USE_RECOMBINATION      1
 #define EV_USE_MUTATION           2
@@ -63,8 +51,27 @@ typedef struct {
 #define EV_VEB3 EV_VERBOSE_ULTRA
 
 /**
+ * Structur holding aditional information during an evolution
+ *
+ * +------------------------------------+-------------------------------------+
+ * | Value                              | describtion                         |
+ * +------------------------------------+-------------------------------------+
+ * | int improovs                       | indecates how many Individual where |
+ * |                                    | better then their predecessors      |
+ * |                                    | during the last generation          |
+ * |                                    |                                     |
+ * | int generations_progressed         | indicates how many generations are  |
+ * |                                    | are already processed               |
+ * +------------------------------------+-------------------------------------+
+ */
+typedef struct {
+ int improovs; 
+ int generations_progressed;
+} EvolutionInfo;
+
+/**
  * An Individual wich has an definied fitness
- * as higher as longer it lives
+ * the better the longer it lives
  */
 typedef struct {
   void    *individual;         /* void pointer to the Individual */
@@ -108,10 +115,11 @@ typedef struct {
  * |                                    | probability to get an improoved     |
  * |                                    | individuals should be around 1/5    |
  * |                                    |                                     |
- * | char continue_ev(Individual *ivs,  | takes an pointer to the current     |
- * |                  void *opts)       | Individuals and should return 0 if  |
- * |                                    | the calculaten should stop and 1 if |
- * |                                    | the calculaten should continue      |
+ * | char continue_ev(Evolution *const  | takes an pointer to the current     |
+ * |                  ev)               | Evolution struct (read onley) and   |
+ * |                                    | should return 0 if the calculaten   |
+ * |                                    | should stop and 1 if the calculaten |
+ * |                                    | should continue                     |
  * |                                    |                                     |
  * | int population_size                | Number of Individuals in your       |
  * |                                    | Evolution population (the real      |
@@ -255,7 +263,7 @@ typedef struct {
                            Individual *, 
                            Individual *, 
                            void *);
-  char     (*continue_ev) (Individual *, void *);
+  char     (*continue_ev) (Evolution *const);
   int      population_size;
   int      generation_limit;
   double   mutation_propability;
@@ -278,7 +286,6 @@ char void_ptr_equal(void *a, void *b);
 /**
  * Struct holding information for the thread clients
  */
-typedef struct Evolution Evolution;
 typedef const struct {
   Evolution *ev;          /* pointer to the current Evolution struct */
   int index;              /* index of the current working thread     */
@@ -371,7 +378,7 @@ struct Evolution {
   void           *(*const init_individual) (void *);
   void           (*const clone_individual) (void *, void *, void *);
   void           (*const free_individual) (void *, void *);
-  char           (*const continue_ev) (Individual *, void *);  // TODO gets the current Evolution as arg
+  char           (*const continue_ev) (Evolution *const); 
   void           (*const mutate) (Individual *, void *);
   int64_t        (*const fitness) (Individual *, void *);
   void           (*const recombinate) (Individual *, 
