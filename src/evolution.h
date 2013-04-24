@@ -20,11 +20,19 @@
  * |                                    |                                     |
  * | int generations_progressed         | indicates how many generations are  |
  * |                                    | are already processed               |
+ * |                                    |                                     |
+ * | int deaths                         | number of individuals die during an |
+ * |                                    | gerenation change                   |
+ * |                                    |                                     |
+ * | int survives                       | number of individuals survive       |
+ * |                                    | during an gerenation change         |
  * +------------------------------------+-------------------------------------+
  */
 typedef struct {
  int improovs; 
  int generations_progressed;
+ int deaths;
+ int survives;
 } EvolutionInfo;
 
 /**
@@ -386,7 +394,6 @@ struct Evolution {
   const int      i_mut_propability;
   TClient *const thread_clients;
   EvThreadArgs   *thread_args;
-  char last_improovs_str[25];
   EvolutionInfo info;
 };
 

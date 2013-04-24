@@ -262,6 +262,8 @@ Evolution *new_evolution(EvInitArgs *args) {
   *(char *) &ev->sort_max                  = args->flags & EV_SORT_MAX;
   *(uint64_t *) &ev->verbose                   = args->flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
   *(int *) &ev->min_quicksort             = EV_QICKSORT_MIN;
+  ev->info.deaths   = (int) ((double) ev->population_size * ev->death_percentage);
+  ev->info.survives = ev->population_size - ev->info.deaths;
 
   /**
    * init thread lib
@@ -429,10 +431,7 @@ void *threadable_init_individual(void *arg) {
  */
 Individual *evolute(Evolution *ev) {
 
-  int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
-  int survives = ev->population_size - deaths;
   Individual *tmp_iv;
-  sprintf(ev->last_improovs_str, "Not knowen");
 
   /**
    * Generation loop
@@ -450,7 +449,7 @@ Individual *evolute(Evolution *ev) {
      * If we keep the last generation, we can recombinate in place
      * else wen wirst calculate an new populion
      */
-    start = ev->keep_last_generation ? survives : ev->population_size;
+    start = ev->keep_last_generation ? ev->info.survives : ev->population_size;
     end   = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
 
 
@@ -524,12 +523,9 @@ Individual *evolute(Evolution *ev) {
      */
     EV_SELECTION(ev);
 
-    if (ev->verbose >= EV_VERBOSE_ONELINE)
-      sprintf(ev->last_improovs_str, "%.5f", (ev->info.improovs / (double) deaths) * 100.0);
-
     if (ev->verbose >= EV_VERBOSE_HIGH) {
-      printf("improovs: %10d -> %9s%%      best fitness: %10li                                                         \n", 
-                ev->info.improovs, ev->last_improovs_str, ev->population[0]->fitness);
+      printf("improovs: %10d -> %15.5f%%      best fitness: %10li                                                         \n", 
+                ev->info.improovs, ((ev->info.improovs / (double) ev->info.deaths) * 100.0), ev->population[0]->fitness);
     }
   }
 
@@ -602,14 +598,14 @@ void *threadable_recombinate(void *arg) {
 
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
-        printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", 
-                ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
+        printf("Evolution: generation left %10d tasks recombination %10d improovs %15.5f%%\r", 
+                ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ((ev->info.improovs / (double) ev->info.deaths) * 100.0));
       pthread_mutex_unlock(&ev_mutex);
     }
     if (ev->verbose >= EV_VERBOSE_ULTRA) {
       pthread_mutex_lock(&ev_mutex);
-        printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\n", 
-                ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
+        printf("Evolution: generation left %10d tasks recombination %10d improovs %15.5f%%\n", 
+                ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ((ev->info.improovs / (double) ev->info.deaths) * 100.0));
       pthread_mutex_unlock(&ev_mutex);
     }
   }
@@ -666,14 +662,14 @@ void *threadable_mutation_onely_1half(void *arg) {
     
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
-        printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
-                                        ev->generation_limit - ev->info.generations_progressed, ev->parallel_start - j, ev->last_improovs_str);
+        printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %15.5f%%\r", 
+                                        ev->generation_limit - ev->info.generations_progressed, ev->parallel_start - j, ((ev->info.improovs / (double) ev->info.deaths) * 100.0));
       pthread_mutex_unlock(&ev_mutex);
     }
     if (ev->verbose >= EV_VERBOSE_ULTRA) {
       pthread_mutex_lock(&ev_mutex);
-        printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\n", 
-                                        ev->generation_limit - ev->info.generations_progressed, ev->parallel_start - j, ev->last_improovs_str);
+        printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %15.5f%%\n", 
+                                        ev->generation_limit - ev->info.generations_progressed, ev->parallel_start - j, ((ev->info.improovs / (double) ev->info.deaths) * 100.0));
       pthread_mutex_unlock(&ev_mutex);
     }
   }
@@ -731,14 +727,14 @@ void *threadable_mutation_onely_rand(void *arg) {
    
     if (ev->verbose >= EV_VERBOSE_ONELINE) {
       pthread_mutex_lock(&ev_mutex);
-        printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", 
-               ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
+        printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %15.5f%%\r", 
+               ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ((ev->info.improovs / (double) ev->info.deaths) * 100.0));
       pthread_mutex_unlock(&ev_mutex);
     }
     if (ev->verbose >= EV_VERBOSE_ULTRA) {
       pthread_mutex_lock(&ev_mutex);
-        printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\n", 
-               ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ev->last_improovs_str);
+        printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %15.5f%%\n", 
+               ev->generation_limit - ev->info.generations_progressed, ev->parallel_end - j, ((ev->info.improovs / (double) ev->info.deaths) * 100.0));
       pthread_mutex_unlock(&ev_mutex);
     }
   }

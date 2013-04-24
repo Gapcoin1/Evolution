@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
   args.death_percentage     = 0.5;
   args.opts                 = (void **) &opts;
   args.num_threads          = 4;
-  args.flags                = EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP;
+  args.flags                = EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_VERBOSE_HIGH;
 
   Evolution *ev = new_evolution(&args);
   best = evolute(ev);
