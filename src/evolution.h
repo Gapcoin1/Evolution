@@ -410,17 +410,46 @@ struct Evolution {
   EvolutionInfo  info;
 };
 
+/**
+ * Returns pointer to an new and initialzed Evolution
+ * take pointers for an EvInitArgs struct
+ *
+ * see comment of EvInitArgs for more informations
+ */
+Evolution  *new_evolution(EvInitArgs *args);  
 
-
-// functions
+/**
+ * Starts the actual evolution, which means
+ *  - calculate the fitness for each Individual
+ *  - sort Individual by fitness
+ *  - remove worst individuals
+ *  - grow a new generation
+ *  - calculate untill generation limit is reatched
+ *    or continue_ev returns 0
+ *
+ * Retruns the best individual
+ */
 Individual *evolute(Evolution *ev);
-Evolution  *new_evolution(EvInitArgs *args);  // TODO add description to each function declaration
+
+/**
+ * Computes an evolution for the given args
+ * and returns the best Individual
+ *
+ * see comment of EvInitArgs for more informations
+ */
 Individual best_evolution(EvInitArgs *args);
-void *threadable_init_individual(void *arg);
-void *threadable_recombinate(void *arg);
-void *threadable_mutation_onely_1half(void *args);
-void *threadable_mutation_onely_rand(void *args);
+
+/**
+ * Frees unneded resauces after an evolution calculation
+ */
 void evolution_clean_up(Evolution *ev);
+
+/**
+ * Returns the Size an Evolution with the given args will have
+ *
+ * sizeof_iv are the size of one individual
+ * sizeof_opt are the size of one opt for one thread
+ */
 uint64_t ev_size(int population_size, 
                  int num_threads, 
                  int keep_last_generation, 
