@@ -74,7 +74,7 @@ typedef struct {
  * the better the longer it lives
  */
 typedef struct {
-  void    *individual;         /* void pointer to the Individual */
+  void    *iv;         /* void pointer to the Individual */
   int64_t fitness;             /* the fitness of this Individual */
 } Individual;
 
@@ -85,15 +85,15 @@ typedef struct {
  * +------------------------------------+-------------------------------------+
  * | Value                              | describtion                         |
  * +------------------------------------+-------------------------------------+
- * | void *init_individual(void *opts)  | should return an void pointer to an |
+ * | void *init_iv(void *opts)          | should return an void pointer to an |
  * |                                    | new initialized individual          |
  * |                                    |                                     |
- * | void clone_individual(void *dst,   | takes 2 void pointer to individuals |
+ * | void clone_iv(void *dst,           | takes 2 void pointer to individuals |
  * |                       void *src,   | and should clone the content of the |
  * |                       void *opts)  | second one into the first one       |
  * |                                    |                                     |
- * | void free_individual(void *src,    | takes an void pointer to individual |
- * |                      void *opts)   | and should free the spaces          |
+ * | void free_iv(void *src,            | takes an void ptr to an individual  |
+ * |              void *opts)           | and should free the spaces          |
  * |                                    | allocated by the given individual   |
  * |                                    |                                     |
  * | void mutate(Individual *src,       | takes an void pointer to an         |
@@ -148,8 +148,8 @@ typedef struct {
  * | uint16_t flags                     | flags are discussed below           |
  * +------------------------------------+-------------------------------------+
  *
- * Note: - The void pointer to individuals are not pointer to an Individual 
- *         struct, they are the individual element of the Individual struct.
+ * Note: - The void pointer to ivs are not pointer to an Individual 
+ *         struct, they are the iv element of the Individual struct.
  *       - The last parameter of each function (opts) is an void pointer to 
  *         optional arguments of your choice
  *
@@ -254,11 +254,11 @@ typedef struct {
  * +---------------------------------+----------------------------------------+
  */
 typedef struct {
-  void     *(*init_individual) (void *);
-  void     (*clone_individual) (void *, void *, void *);
-  void     (*free_individual) (void *, void *);
-  void     (*mutate) (Individual *, void *);
-  int64_t  (*fitness) (Individual *, void *);
+  void     *(*init_iv)    (void *);
+  void     (*clone_iv)    (void *, void *, void *);
+  void     (*free_iv)     (void *, void *);
+  void     (*mutate)      (Individual *, void *);
+  int64_t  (*fitness)     (Individual *, void *);
   void     (*recombinate) (Individual *, 
                            Individual *, 
                            Individual *, 
@@ -295,7 +295,7 @@ typedef const struct {
 /**
  * The Evolution struct
  *
- * the most values ar already discussed: see EvInitArgs
+ * the most values are already discussed: see EvInitArgs
  *
  * the other balues are:
  *
@@ -305,7 +305,7 @@ typedef const struct {
  * | Individual **population            | the population of Individuals only  |
  * |                                    | pointers for faster sorting         |
  * |                                    |                                     |
- * | Individual * individuals           | the Individuals                     |
+ * | Individual * ivs                   | the Individuals                     |
  * |                                    |                                     |
  * | char use_recombination             | indicates wether to recombinate the |
  * |                                    | Individuals during a generation     |
@@ -364,7 +364,7 @@ typedef const struct {
  * |                                    | containing an thread specific index |
  * |                                    |                                     |
  * | EvolutionInfo info                 | additional information during an    |
- * |                                    | evolution
+ * |                                    | evolution                           |
  * +------------------------------------+-------------------------------------+
  * 
  * Note: many values are const like opts (an const pointer to an array of
@@ -374,17 +374,17 @@ typedef const struct {
  */
 struct Evolution {
   Individual     **population;               
-  Individual     *individuals;               
-  void           *(*const init_individual) (void *);
-  void           (*const clone_individual) (void *, void *, void *);
-  void           (*const free_individual) (void *, void *);
-  char           (*const continue_ev) (Evolution *const); 
-  void           (*const mutate) (Individual *, void *);
-  int64_t        (*const fitness) (Individual *, void *);
-  void           (*const recombinate) (Individual *, 
-                                       Individual *, 
-                                       Individual *, 
-                                       void *);
+  Individual     *ivs;               
+  void           *(*const init_iv)     (void *);
+  void           (*const  clone_iv)    (void *, void *, void *);
+  void           (*const  free_iv)     (void *, void *);
+  char           (*const  continue_ev) (Evolution *const); 
+  void           (*const  mutate)      (Individual *, void *);
+  int64_t        (*const  fitness)     (Individual *, void *);
+  void           (*const  recombinate) (Individual *, 
+                                        Individual *, 
+                                        Individual *, 
+                                        void *);
   const int      population_size;
   const int      generation_limit;
   const double   mutation_propability;
@@ -422,12 +422,12 @@ Evolution  *new_evolution(EvInitArgs *args);
  * Starts the actual evolution, which means
  *  - calculate the fitness for each Individual
  *  - sort Individual by fitness
- *  - remove worst individuals
+ *  - remove worst ivs
  *  - grow a new generation
  *  - calculate untill generation limit is reatched
  *    or continue_ev returns 0
  *
- * Retruns the best individual
+ * Retruns the best iv
  */
 Individual *evolute(Evolution *ev);
 
@@ -441,6 +441,7 @@ Individual best_evolution(EvInitArgs *args);
 
 /**
  * Frees unneded resauces after an evolution calculation
+ * Note it don't touches the spaces of the best individual
  */
 void evolution_clean_up(Evolution *ev);
 

@@ -7,17 +7,17 @@
 static char ev_flags_invalid(uint64_t flags);
 static char valid_args(EvInitArgs *args);
 static void ev_init_tc_and_ivs(Evolution *ev);
-static void *threadable_init_individual(void *arg);
+static void *threadable_init_iv(void *arg);
 static void *threadable_recombinate(void *arg);
 static void *threadable_mutation_onely_1half(void *args);
 static void *threadable_mutation_onely_rand(void *args);
 
-// Evolution mutex
+/* Evolution mutex */
 static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
- * Functions for Sorting the Population by Fitness
- * Macro versions
+ * Functions for sorting the population by fitness
+ * macro versions
  */
 static inline char ev_bigger(Individual *a, Individual *b) {
   return a->fitness > b->fitness;
@@ -60,7 +60,7 @@ static inline char ev_equal(Individual *a, Individual *b) {
 
 /**
  * Sadly we have to subvert the type system to initialize an const members
- * of an struct on the heap. (thre are other ways with memcpy and an static
+ * of an struct on the heap. (there are other ways with memcpy and an static
  * initialized const struct, but thats C99 and it will get even uglier than
  * than this)
  * For explanation we have to get the address of the const value cast this
@@ -112,17 +112,17 @@ Evolution *new_evolution(EvInitArgs *args) {
   int mul = (args->flags & EV_KEEP) ? 1 : 2;
 
   size_t population_space  = sizeof(Individual *); 
-  size_t individuals_space = sizeof(Individual); 
+  size_t ivs_space = sizeof(Individual); 
 
   population_space  *= args->population_size * mul;
-  individuals_space *= args->population_size * mul;
+  ivs_space *= args->population_size * mul;
 
   ev->population           = (Individual **) malloc(population_space);
-  ev->individuals          = (Individual *) malloc(individuals_space);
+  ev->ivs          = (Individual *) malloc(ivs_space);
 
-  INIT_C_INIT_IV(ev->init_individual,  args->init_individual);
-  INIT_C_CLON_IV(ev->clone_individual, args->clone_individual);
-  INIT_C_FREE_IV(ev->free_individual,  args->free_individual);
+  INIT_C_INIT_IV(ev->init_iv,          args->init_iv);
+  INIT_C_CLON_IV(ev->clone_iv,         args->clone_iv);
+  INIT_C_FREE_IV(ev->free_iv,          args->free_iv);
   INIT_C_MUTTATE(ev->mutate,           args->mutate);
   INIT_C_FITNESS(ev->fitness,          args->fitness);
   INIT_C_RECOMBI(ev->recombinate,      args->recombinate);
@@ -197,7 +197,7 @@ static void ev_init_tc_and_ivs(Evolution *ev) {
     INIT_C_INT(ev->thread_args[i].index, i);
 
     tc_add_func(&ev->thread_clients[i], 
-                threadable_init_individual, 
+                threadable_init_iv, 
                 (void *) &ev->thread_args[i]);
   }
 
@@ -207,7 +207,7 @@ static void ev_init_tc_and_ivs(Evolution *ev) {
   }
 
   /**
-   * Select the best individuals to survive,
+   * Select the best individual to survive,
    * Sort the Individuals by their fittnes
    */
   EV_SELECTION(ev); 
@@ -297,27 +297,33 @@ static char ev_flags_invalid(uint64_t flags) {
 
 /**
  * Frees unneded resauces after an evolution calculation
+ * Note it don't touches the spaces of the best individual
  */
 void evolution_clean_up(Evolution *ev) {
   int end = ev->keep_last_generation ? ev->population_size : 
                                        ev->population_size * 2; 
   int i;
+
+  /**
+   * free individuals starting by index one because
+   * zero is the best individual
+   */
   for (i = 1; i < end; i++) {
-    ev->free_individual(ev->population[i]->individual, 
+    ev->free_iv(ev->population[i]->iv, 
                         ev->opts[i]);
   }
-  free(ev->individuals);
+
+  free(ev->ivs);
   free(ev->population);
 }
 
 /**
- * Computes an evolution for the given params
+ * Computes an evolution for the given args
  * and returns the best Individual
  */
 Individual best_evolution(EvInitArgs *args) {
 
-  Evolution *ev = new_evolution(args);
-
+  Evolution *ev   = new_evolution(args);
   Individual best = *evolute(ev);
   evolution_clean_up(ev);
 
@@ -325,9 +331,10 @@ Individual best_evolution(EvInitArgs *args) {
 }
 
 /**
- * Parallel init_individual function
+ * Parallel init_iv function
  */
-static void *threadable_init_individual(void *arg) {
+static void *threadable_init_iv(void *arg) {
+
   EvThreadArgs *evt = arg;
   Evolution *ev = evt->ev;
   int i;
@@ -342,9 +349,10 @@ static void *threadable_init_individual(void *arg) {
       i = ev->parallel_index;
     pthread_mutex_unlock(&ev_mutex);
  
-    ev->population[i] = ev->individuals + i;
-    ev->individuals[i].individual = ev->init_individual(ev->opts[evt->index]);
-    ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts[evt->index]);  
+    ev->population[i] = ev->ivs + i;
+    ev->ivs[i].iv = ev->init_iv(ev->opts[evt->index]);
+    ev->population[i]->fitness = ev->fitness(ev->population[i], 
+                                             ev->opts[evt->index]);  
  
     pthread_mutex_lock(&ev_mutex);
       if (ev->verbose >= EV_VERBOSE_ONELINE)
@@ -357,13 +365,14 @@ static void *threadable_init_individual(void *arg) {
   pthread_mutex_unlock(&ev_mutex);
 
   return arg;
+
 }
 
 /**
  * do the actual evolution, which means
  *  - calculate the fitness for each Individual
  *  - sort Individual by fitness
- *  - remove worst individuals
+ *  - remove worst ivs
  *  - grow a new generation
  *
  * Retruns the best individual
@@ -414,7 +423,7 @@ Individual *evolute(Evolution *ev) {
         tc_join(&ev->thread_clients[j]);
       }
 
-    // copy and mutate individuals
+    // copy and mutate ivs
     } else {
       
       /**
@@ -472,7 +481,7 @@ Individual *evolute(Evolution *ev) {
     }
 
     /**
-     * Select the best individuals to survive,
+     * Select the best individuals to survindividuale,
      * Sort the Individuals by theur fittnes
      */
     EV_SELECTION(ev);
@@ -513,13 +522,13 @@ static void *threadable_recombinate(void *arg) {
     rand2 = rand1 = rand() % ev->parallel_start;
     while (rand1 == rand2) rand2 = rand() % ev->parallel_start; // TODO prevent endless loop if one one idividual survivors
     
-    // recombinate individuals
+    /* recombinate individuals */
     ev->recombinate(ev->population[rand1], 
                     ev->population[rand2], 
                     ev->population[j], 
                     ev->opts[evt->index]);
     
-    // mutate Individuals
+    /* mutate Individuals */
     if (ev->use_muttation) {
       if (ev->always_mutate)
         ev->mutate(ev->population[j], ev->opts[evt->index]);
@@ -529,7 +538,7 @@ static void *threadable_recombinate(void *arg) {
       }
     }
 
-    // calculate the fittnes for the new individual
+    /* calculate the fittnes for the new individuals */
     ev->population[j]->fitness = ev->fitness(ev->population[j], 
                                              ev->opts[evt->index]);
 
@@ -595,11 +604,11 @@ static void *threadable_mutation_onely_1half(void *arg) {
       ev->parallel_index++;
     pthread_mutex_unlock(&ev_mutex);
 
-    ev->clone_individual(ev->population[j + ev->parallel_start]->individual, 
-                         ev->population[j]->individual, ev->opts[evt->index]);
+    ev->clone_iv(ev->population[j + ev->parallel_start]->iv, 
+                         ev->population[j]->iv, ev->opts[evt->index]);
     ev->mutate(ev->population[j + ev->parallel_start], ev->opts[evt->index]);
 
-    // calculate the fittnes for the new individual
+    /* calculate the fittnes for the new individual */
     ev->population[j + ev->parallel_start]->fitness = ev->fitness(ev->population[j + ev->parallel_start], ev->opts[evt->index]);
     
     /**
@@ -661,12 +670,12 @@ static void *threadable_mutation_onely_rand(void *arg) {
     pthread_mutex_unlock(&ev_mutex);
 
     rand1 = rand() % ev->parallel_start;
-    ev->clone_individual(ev->population[j]->individual, 
-                         ev->population[rand1]->individual, 
+    ev->clone_iv(ev->population[j]->iv, 
+                         ev->population[rand1]->iv, 
                          ev->opts[evt->index]);
     ev->mutate(ev->population[j], ev->opts[evt->index]);
 
-    // calculate the fittnes for the new individual
+    /* calculate the fittnes for the new iv */
     ev->population[j]->fitness = ev->fitness(ev->population[j], 
                                              ev->opts[evt->index]);
    
@@ -703,7 +712,7 @@ static void *threadable_mutation_onely_rand(void *arg) {
     }
   }
 
-  // after break we must unlock
+  /* after break we must unlock */
   pthread_mutex_unlock(&ev_mutex);
 
   return arg;
@@ -722,11 +731,11 @@ uint64_t ev_size(int population_size,
 
   uint64_t size = (uint64_t) sizeof(Evolution);
   size += (uint64_t) sizeof(EvThreadArgs) * num_threads;
-  size += (uint64_t) sizeof(pthread_t) * num_threads;
+  size += (uint64_t) sizeof(TClient)      * num_threads;
   size += sizeof_opt * num_threads;
   size += (uint64_t) sizeof(Individual *) * population_size * mul;
-  size += (uint64_t) sizeof(Individual) * population_size * mul;
-  size += sizeof_iv * population_size * mul;
+  size += (uint64_t) sizeof(Individual)   * population_size * mul;
+  size += sizeof_iv  * population_size    * mul;
 
   return size;
 }
