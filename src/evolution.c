@@ -6,6 +6,7 @@
 /* static functions */
 static char ev_flags_invalid(uint64_t flags);
 static char valid_args(EvInitArgs *args);
+static void ev_init_tc_and_ivs(Evolution *ev);
 
 // Evolution mutex
 static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -54,156 +55,39 @@ static inline char ev_equal(Individual *a, Individual *b) {
   } while (0)
 
 /**
+ * Sadly we have to subvert the type system to initialize an const members
+ * of an struct on the heap. (thre are other ways with memcpy and an static
+ * initialized const struct, but thats C99 and it will get even uglier than
+ * than this)
+ * For explanation we have to get the address of the const value cast this
+ * address to an pointer of an non const version of the specific value
+ * and dereference this pointer to set the acctual const value
+ */
+#define INIT_C_INIT_IV(X, Y) *(void *(**)(void *))                 &(X) = (Y)
+#define INIT_C_CLON_IV(X, Y) *(void (**)(void *, void *, void *))  &(X) = (Y)
+#define INIT_C_FREE_IV(X, Y) *(void (**)(void *, void *))          &(X) = (Y)
+#define INIT_C_MUTTATE(X, Y) *(void (**)(Individual *, void *))    &(X) = (Y)
+#define INIT_C_FITNESS(X, Y) *(int64_t (**)(Individual *, void *)) &(X) = (Y)
+#define INIT_C_RECOMBI(X, Y) *(void (**)(Individual *,                        \
+                                         Individual *,                        \
+                                         Individual *,                        \
+                                         void *))                  &(X) = (Y)
+#define INIT_C_CONTINU(X, Y) *(char (**)(Evolution *const))        &(X) = (Y)
+#define INIT_C_EVTARGS(X, Y) *(EvThreadArgs **)                    &(X) = (Y)
+#define INIT_C_INT(X, Y)     *(int *)                              &(X) = (Y)
+#define INIT_C_DBL(X, Y)     *(double *)                           &(X) = (Y)
+#define INIT_C_OPT(X, Y)     *(void ***)                           &(X) = (Y)
+#define INIT_C_TCS(X, Y)     *(TClient **)                         &(X) = (Y)
+#define INIT_C_CHR(X, Y)     *(char *)                             &(X) = (Y)
+#define INIT_C_U64(X, Y)     *(uint64_t *)                         &(X) = (Y)
+#define INIT_C_U16(X, Y)     *(uint16_t *)                         &(X) = (Y)
+#define INIT_C_EVO(X, Y)     *(Evolution **)                       &(X) = (Y)
+
+/**
  * Returns pointer to an new and initialzed Evolution
- * take pointers for varius functions:
+ * take pointers for an EvInitArgs struct
  *
- * opts can be used for aditional function wide values
- *
- * +------------------------------------+-------------------------------------+
- * | function pointer                   | describtion                         |
- * +------------------------------------+-------------------------------------+
- * | void *init_individual(void *opts)  | should return an void pointer to an |
- * |                                    | new initialized individual          |
- * |                                    |                                     |
- * | void clone_individual(void *dst,   | takes 2 void pointer to individuals |
- * |                       void *src,   | and should clone the content of the |
- * |                       void *opts)  | second one into the first one       |
- * |                                    |                                     |
- * | void free_individual(void *src,    | takes an void pointer to individual |
- * |                      void *opts)   | and should free the spaces          |
- * |                                    | allocated by the given individual   |
- * |                                    |                                     |
- * | void mutate(Individual *src,       | takes an void pointer to an         |
- * |             void *opts)            | individual and should change it in  |
- * |                                    | a way that the probability to       |
- * |                                    | improove it is around 1/5           |
- * |                                    |                                     |
- * | int fitness(Individual *src,       | takes an void pointer to an         |
- * |             void *opts)            | individual, and should return an    |
- * |                                    | integer value that indicates how    |
- * |                                    | strong (good / improoved / near by  |
- * |                                    | an optimal solution) it is. Control |
- * |                                    | the sorting order with the flags    |
- * |                                    |                                     |
- * | void recombinate(Individual *src1, | takes 3 void pointer to individuals |
- * |                  Individual *src2, | and should combinate the first two  |
- * |                  Individual *dst,  | one, and should save the result in  |
- * |                  void *opts)       | the thired one. As mutate the       |
- * |                                    | probability to get an improoved     |
- * |                                    | individuals should be around 1/5    |
- * |                                    |                                     |
- * | char continue_ev(Individual *ivs,  | takes an pointer to the current     |
- * |                  void *opts)       | Individuals and should return 0 if  |
- * |                                    | the calculaten should stop and 1 if |
- * |                                    | the calculaten should continue      |
- * +------------------------------------+-------------------------------------+
- *
- * Note: - The void pointer to individuals are not pointer to an Individual 
- *         struct, they are the individual element of the Individual struct.
- *       - The last parameter of each function (opts) is an void pointer to 
- *         optional arguments of your choice
- *
- *
- * flags can be:
- *
- *    EV_UREC / EV_USE_RECOMBINATION
- *    EV_UMUT / EV_USE_MUTATION
- *    EV_AMUT / EV_ALWAYS_MUTATE
- *    EV_KEEP / EV_KEEP_LAST_GENERATION
- *    EV_ABRT / EV_USE_ABORT_REQUIREMENT
- *    EV_SMAX / EV_SORT_MAX
- *    EV_SMIN / EV_SORT_MIN
- *    EV_VEB0 / EV_VERBOSE_QUIET
- *    EV_VER1 / EV_VERBOSE_ONELINE
- *    EV_VER2 / EV_VERBOSE_HIGH
- *    EV_VER3 / EV_VERBOSE_ULTRA
- *
- * The floowing flag combinations are possible:
- *
- * +---------------------------------+----------------------------------------+
- * | Flag combination                | descrion                               |
- * +---------------------------------+----------------------------------------+
- * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP | Recombinate and always mutate          |
- * | |EV_ABRT                        | individuals, keep last generation,     |
- * |                                 | and use abort requirement function     |
- * |                                 |                                        |
- * | EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT | Onley mutate individual keep last      |
- * |                                 | generation and use abort requirement   |
- * |                                 | function                               |
- * |                                 |                                        |
- * | EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT | Recombinate and maybe mutate           |
- * |                                 | individuals (depending on a given      |
- * |                                 | probability) keep last generation and  |
- * |                                 | use abort requirement function         |
- * |                                 |                                        |
- * | EV_UREC|EV_KEEP|EV_ABRT         | Recombinate individuals, keep last     |
- * |                                 | generation and use abort requirement   |
- * |                                 | function                               |
- * |                                 |                                        |
- * | EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT | Recombinate and always mutate          |
- * |                                 | individuals, disgard last generation.  |
- * |                                 | and use abort requirement function     |
- * |                                 |                                        |
- * | EV_UMUT|EV_AMUT|EV_ABRT         | Onely mutate individuals, disgard last |
- * |                                 | generation, and use abort requirement  |
- * |                                 | function                               |
- * |                                 |                                        |
- * | EV_UREC|EV_UMUT|EV_ABRT         | Recombinate and maybe mutate           |
- * |                                 | individuals (depending on a given      |
- * |                                 | probability), disgard last generation  |
- * |                                 | and use abort requirement function     |
- * |                                 |                                        |
- * | EV_UREC|EV_ABRT                 | Recombinate individuals, disgard last  |
- * |                                 | generation and use abort requirement   |
- * |                                 | function                               |
- * |                                 |                                        |
- * | EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP | Recombinate and always mutate          |
- * |                                 | individuals, keep last generation, and |
- * |                                 | calc until generation limit is         |
- * |                                 | reatched                               |
- * |                                 |                                        |
- * | EV_UMUT|EV_AMUT|EV_KEEP         | Onely mutate individuals, keep last    |
- * |                                 | generation and calc until generation   |
- * |                                 | limit is reatched                      |
- * |                                 |                                        |
- * | EV_UREC|EV_UMUT|EV_KEEP         | Recombinate and maybe mutate           |
- * |                                 | individuals, keep last generation and  |
- * |                                 | calc until generation limit is         |
- * |                                 | reatched                               |
- * |                                 |                                        |
- * | EV_UREC|EV_KEEP                 | Recombinate individuals, keep last     |
- * |                                 | generation and calc until generation   |
- * |                                 | limit is reatched                      |
- * |                                 |                                        |
- * | EV_UREC|EV_UMUT|EV_AMUT         | Recombinate and always mutate          |
- * |                                 | individuals, disgard last generation   |
- * |                                 | and calc until generation imit is      |
- * |                                 | reatched                               |
- * |                                 |                                        |
- * | EV_UMUT|EV_AMUT                 | Recombinate and always mutate          |
- * |                                 | Individuals disgard old generation and |
- * |                                 | calc until generation limit is         |
- * |                                 | reatched                               |
- * |                                 |                                        |
- * | EV_UREC|EV_UMUT                 | Recombinate and maybe mutate           |
- * |                                 | Individual (depending on a given       |
- * |                                 | probability) disgard old generation    |
- * |                                 | and calc until generation limit is     |
- * |                                 | reatched                               |
- * |                                 |                                        |
- * | EV_UREC                         | Recombinate Individual onley disgard   |
- * |                                 | old generation and calc until          |
- * |                                 | generation limit is reatched           |
- * +---------------------------------+----------------------------------------+
- *
- * to all of the above combination an EV_SMIN / EV_SMAX can be added
- * standart is EV_SMIN
- * Also an verbosytiy level of:
- *    EV_VERBOSE_QUIET    (EV_VEB0), 
- *    EV_VERBOSE_ONELINE  (EV_VEB1)
- *    EV_VERBOSE_HIGH     (EV_VEB2) 
- *    EV_VERBOSE_ULTRA    (EV_VEB3)
- * can be added, standart is EV_VERBOSE_QUIET
+ * see comment of EvInitArgs for more informations
  */
 Evolution *new_evolution(EvInitArgs *args) {
 
@@ -211,80 +95,110 @@ Evolution *new_evolution(EvInitArgs *args) {
   if (!valid_args(args))
     return NULL;
 
-  // int random
+  /* int random */
   srand(time(NULL));
 
+  /* create new Evolution */
   Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
 
   /**
    * multiplicator: if we should discard the last generation, 
    * we can't recombinate in place
    */
-  int mul = ev->keep_last_generation ? 1 : 2;
-  size_t population_space       = sizeof(Individual *) * args->population_size * mul;
-  size_t individuals_space      = sizeof(Individual) * args->population_size * mul;
+  int mul = (args->flags & EV_KEEP) ? 1 : 2;
 
-  ev->population                = (Individual **) malloc(population_space);
-  ev->individuals               = (Individual *) malloc(individuals_space);
+  size_t population_space  = sizeof(Individual *); 
+  size_t individuals_space = sizeof(Individual); 
+
+  population_space  *= args->population_size * mul;
+  individuals_space *= args->population_size * mul;
+
+  ev->population           = (Individual **) malloc(population_space);
+  ev->individuals          = (Individual *) malloc(individuals_space);
+
+  INIT_C_INIT_IV(ev->init_individual,  args->init_individual);
+  INIT_C_CLON_IV(ev->clone_individual, args->clone_individual);
+  INIT_C_FREE_IV(ev->free_individual,  args->free_individual);
+  INIT_C_MUTTATE(ev->mutate,           args->mutate);
+  INIT_C_FITNESS(ev->fitness,          args->fitness);
+  INIT_C_RECOMBI(ev->recombinate,      args->recombinate);
+  INIT_C_CONTINU(ev->continue_ev,      args->continue_ev);
+  INIT_C_EVTARGS(ev->thread_args,      malloc(sizeof(EvThreadArgs) *
+                                               args->num_threads));
+
+  INIT_C_INT(ev->population_size,       args->population_size);
+  INIT_C_INT(ev->generation_limit,      args->generation_limit);
+  INIT_C_DBL(ev->mutation_propability,  args->mutation_propability);
+  INIT_C_DBL(ev->death_percentage,      args->death_percentage);
+  INIT_C_OPT(ev->opts,                  args->opts);
+  INIT_C_INT(ev->num_threads,           args->num_threads);
+  INIT_C_TCS(ev->thread_clients,        malloc(sizeof(TClient) * 
+                                               args->num_threads));
+
+  INIT_C_INT(ev->i_mut_propability,     (int) ((double) RAND_MAX * 
+                                               ev->mutation_propability));
+
+  INIT_C_CHR(ev->use_recombination,     args->flags & EV_UREC);
+  INIT_C_CHR(ev->use_muttation,         args->flags & EV_UMUT);
+  INIT_C_CHR(ev->always_mutate,         args->flags & EV_AMUT);
+  INIT_C_CHR(ev->keep_last_generation,  args->flags & EV_KEEP);
+  INIT_C_CHR(ev->use_abort_requirement, args->flags & EV_ABRT);
+  INIT_C_CHR(ev->sort_max,              args->flags & EV_SMAX);
+  INIT_C_U16(ev->verbose,               args->flags & (EV_VEB1 |
+                                                       EV_VEB2 |
+                                                       EV_VEB3));
+
+  INIT_C_INT(ev->min_quicksort,         EV_QICKSORT_MIN);
+  INIT_C_INT(ev->deaths,                (int) ((double) ev->population_size * 
+                                               ev->death_percentage));
+  INIT_C_INT(ev->survivors,             ev->population_size - ev->deaths);
+
+  ev->parallel_index                    = 0;
+  ev->info.improovs                     = 0;
+
   /**
-   * it's a bit trikey to initilaize a const value in an 
-   * dynmic allocated struct and it gets even harder vor function pointer
-   * we have to get the address where the function pointer is stored and 
-   * cast this adress to an pointer of that function pointer without const
-   * and dereference this pointer (of an function pointer) and set its content
-   * to the given function pointer
+   * Initializes Thread Clients and Individuals
    */
-  *(void *(**)(void *)) &ev->init_individual           = args->init_individual;
-  *(void (**)(void *, void *, void *)) &ev->clone_individual          = args->clone_individual;
-  *(void (**)(void *, void *)) &ev->free_individual           = args->free_individual;
-  *(void (**)(Individual *, void *)) &ev->mutate                    = args->mutate;
-  *(int64_t (**)(Individual *, void *)) &ev->fitness                   = args->fitness;
-  *(void (**)(Individual *, Individual *, Individual *, void *)) &ev->recombinate               = args->recombinate;
-  *(char (**) (Evolution *const)) &ev->continue_ev               = args->continue_ev;
-  *(int *) &ev->population_size = args->population_size;
-  *(int *) &ev->generation_limit = args->generation_limit;
-  *(double *) &ev->mutation_propability      = args->mutation_propability;
-  *(double *) &ev->death_percentage          = args->death_percentage;
-  *(void ***) &ev->opts                      = args->opts;
-  *(int *) &ev->num_threads      = args->num_threads;
-  ev->parallel_index                = 0;
-  ev->info.improovs    = 0;
-  *(TClient **) &ev->thread_clients   = malloc(sizeof(TClient) * args->num_threads);
-  ev->thread_args       = malloc(sizeof(EvThreadArgs) 
-                                         * args->num_threads);
-  *(int *) &ev->i_mut_propability           = (int) ((double) RAND_MAX 
-                                         * ev->mutation_propability);
-  *(char *) &ev->use_recombination          = args->flags & EV_USE_RECOMBINATION;
-  *(char *) &ev->use_muttation             = args->flags & EV_USE_MUTATION;
-  *(char *) &ev->always_mutate             = args->flags & EV_ALWAYS_MUTATE;
-  *(char *) &ev->keep_last_generation      = args->flags & EV_KEEP_LAST_GENERATION;
-  *(char *) &ev->use_abort_requirement     = args->flags & EV_USE_ABORT_REQUIREMENT;
-  *(char *) &ev->sort_max                  = args->flags & EV_SORT_MAX;
-  *(uint64_t *) &ev->verbose                   = args->flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
-  *(int *) &ev->min_quicksort             = EV_QICKSORT_MIN;
-  *(int *) &ev->deaths   = (int) ((double) ev->population_size * ev->death_percentage);
-  *(int *) &ev->survivors = ev->population_size - ev->deaths;
+  ev_init_tc_and_ivs(ev);
+
+  return ev;
+}
+
+/**
+ * Initializes Thread Clients and Individuals
+ */
+static void ev_init_tc_and_ivs(Evolution *ev) {
 
   /**
    * init thread lib
    * max work will be death_percentage * num individuals
    */
   int i;
-  for (i = 0; i < args->num_threads; i++)
+  for (i = 0; i < ev->num_threads; i++)
     init_thread_client(&ev->thread_clients[i]);
 
+  /**
+   * multiplicator: if we should discard the last generation, 
+   * we can't recombinate in place
+   */
+  int mul = ev->keep_last_generation ? 1 : 2;
 
-  ev->parallel_index = args->population_size * mul;
+  /* start of parallel calculation */
+  ev->parallel_index = ev->population_size * mul;
 
   /* add work for the clients */
-  for (i = 0; i < args->num_threads; i++) {
-    *(Evolution **) &ev->thread_args[i].ev = ev;
-    *(int *) &ev->thread_args[i].index = i;
-    tc_add_func(&ev->thread_clients[i], threadable_init_individual, (void *) &ev->thread_args[i]);
+  for (i = 0; i < ev->num_threads; i++) {
+
+    INIT_C_EVO(ev->thread_args[i].ev,    ev);
+    INIT_C_INT(ev->thread_args[i].index, i);
+
+    tc_add_func(&ev->thread_clients[i], 
+                threadable_init_individual, 
+                (void *) &ev->thread_args[i]);
   }
 
   // wait for threads
-  for (i = 0; i < args->num_threads; i++) {
+  for (i = 0; i < ev->num_threads; i++) {
     tc_join(&ev->thread_clients[i]);
   }
 
@@ -297,8 +211,27 @@ Evolution *new_evolution(EvInitArgs *args) {
   if (ev->verbose >= EV_VERBOSE_HIGH)
     printf("Population Initialized\n");
 
-  return ev;
 }
+
+/**
+ * Undef const initializer to avoid reusing it
+ */
+#undef INIT_C_INIT_IV  
+#undef INIT_C_CLON_IV 
+#undef INIT_C_FREE_IV  
+#undef INIT_C_MUTTATE   
+#undef INIT_C_FITNESS  
+#undef INIT_C_RECOMBI    
+#undef INIT_C_CONTINU   
+#undef INIT_C_EVTARGS
+#undef INIT_C_INT      
+#undef INIT_C_DBL      
+#undef INIT_C_OPT     
+#undef INIT_C_TCS      
+#undef INIT_C_CHR      
+#undef INIT_C_U64 
+#undef INIT_C_U16
+#undef INIT_C_EVO
 
 /**
  * Returns wether the given EvInitArgs are valid or not
@@ -422,12 +355,12 @@ void *threadable_init_individual(void *arg) {
 
 /**
  * do the actual evolution, which means
- *  - calculate the fittnes for each Individual
- *  - sort Individual by fittnes
+ *  - calculate the fitness for each Individual
+ *  - sort Individual by fitness
  *  - remove worst individuals
  *  - grow a new generation
  *
- * Parallel version
+ * Retruns the best individual
  */
 Individual *evolute(Evolution *ev) {
 

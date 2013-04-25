@@ -406,7 +406,7 @@ struct Evolution {
   int            parallel_end; 
   const int      i_mut_propability;
   TClient *const thread_clients;
-  EvThreadArgs   *thread_args;
+  EvThreadArgs   *const thread_args;
   EvolutionInfo  info;
 };
 
