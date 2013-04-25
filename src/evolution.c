@@ -70,7 +70,6 @@ static inline char ev_equal(Individual *a, Individual *b) {
 #define INIT_C_INIT_IV(X, Y) *(void *(**)(void *))                 &(X) = (Y)
 #define INIT_C_CLON_IV(X, Y) *(void (**)(void *, void *, void *))  &(X) = (Y)
 #define INIT_C_FREE_IV(X, Y) *(void (**)(void *, void *))          &(X) = (Y)
-#define INIT_C_FREEOPT(X, Y) *(void (**)(void *))                  &(X) = (Y)
 #define INIT_C_MUTTATE(X, Y) *(void (**)(Individual *, void *))    &(X) = (Y)
 #define INIT_C_FITNESS(X, Y) *(int64_t (**)(Individual *, void *)) &(X) = (Y)
 #define INIT_C_RECOMBI(X, Y) *(void (**)(Individual *,                        \
@@ -124,7 +123,6 @@ Evolution *new_evolution(EvInitArgs *args) {
   INIT_C_INIT_IV(ev->init_individual,  args->init_individual);
   INIT_C_CLON_IV(ev->clone_individual, args->clone_individual);
   INIT_C_FREE_IV(ev->free_individual,  args->free_individual);
-  INIT_C_FREEOPT(ev->free_opt,         args->free_opt);
   INIT_C_MUTTATE(ev->mutate,           args->mutate);
   INIT_C_FITNESS(ev->fitness,          args->fitness);
   INIT_C_RECOMBI(ev->recombinate,      args->recombinate);
@@ -225,7 +223,6 @@ static void ev_init_tc_and_ivs(Evolution *ev) {
 #undef INIT_C_INIT_IV  
 #undef INIT_C_CLON_IV 
 #undef INIT_C_FREE_IV  
-#undef INIT_C_FREEOPT
 #undef INIT_C_MUTTATE   
 #undef INIT_C_FITNESS  
 #undef INIT_C_RECOMBI    
@@ -305,20 +302,10 @@ void evolution_clean_up(Evolution *ev) {
   int end = ev->keep_last_generation ? ev->population_size : 
                                        ev->population_size * 2; 
   int i;
-
-  /**
-   * free Individuals
-   */
-  for (i = 1; i < end; i++)
+  for (i = 1; i < end; i++) {
     ev->free_individual(ev->population[i]->individual, 
                         ev->opts[i]);
-
-  /**
-   * free opts
-   */
-  for (i = 0; i < ev->num_threads; i++)
-    ev->free_opt(ev->opts[i]);
-
+  }
   free(ev->individuals);
   free(ev->population);
 }
