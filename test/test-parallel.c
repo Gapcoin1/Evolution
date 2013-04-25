@@ -45,6 +45,10 @@ void free_v(void *dst, void *opts) {
   free((Vektor *) dst);
 }
 
+void free_opt(void *opt) {
+  (void) opt;
+}
+
 void recombinate_v(Individual *src1, Individual *src2, Individual *dst, void *opts) {
   (void) opts;
   Vektor *vs1 = (Vektor *) src1->individual;
@@ -94,6 +98,7 @@ int main(int argc, char *argv[]) {
   args.init_individual      = init_v;
   args.clone_individual     = clone_v;
   args.free_individual      = free_v;
+  args.free_opt             = free_opt;
   args.mutate               = mutate_v;
   args.fitness              = fittnes_v;
   args.recombinate          = recombinate_v;

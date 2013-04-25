@@ -96,6 +96,11 @@ typedef struct {
  * |                      void *opts)   | and should free the spaces          |
  * |                                    | allocated by the given individual   |
  * |                                    |                                     |
+ * | void free_opt(void *opt)           | takes an void pointer to one        |
+ * |                                    | element of the opts array and       |
+ * |                                    | should free the spaces allocated by |
+ * |                                    | the given element                   |
+ * |                                    |                                     |
  * | void mutate(Individual *src,       | takes an void pointer to an         |
  * |             void *opts)            | individual and should change it in  |
  * |                                    | a way that the probability to       |
@@ -257,6 +262,7 @@ typedef struct {
   void     *(*init_individual) (void *);
   void     (*clone_individual) (void *, void *, void *);
   void     (*free_individual) (void *, void *);
+  void     (*free_opt) (void *);
   void     (*mutate) (Individual *, void *);
   int64_t  (*fitness) (Individual *, void *);
   void     (*recombinate) (Individual *, 
@@ -378,6 +384,7 @@ struct Evolution {
   void           *(*const init_individual) (void *);
   void           (*const clone_individual) (void *, void *, void *);
   void           (*const free_individual) (void *, void *);
+  void           (*const free_opt) (void *);
   char           (*const continue_ev) (Evolution *const); 
   void           (*const mutate) (Individual *, void *);
   int64_t        (*const fitness) (Individual *, void *);
