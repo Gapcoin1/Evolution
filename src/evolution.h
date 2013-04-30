@@ -101,7 +101,7 @@ typedef struct {
  * |                                    | a way that the probability to       |
  * |                                    | improove it is around 1/5           |
  * |                                    |                                     |
- * | int fitness(Individual *src,       | takes an void pointer to an         |
+ * | int64_t fitness(Individual *src,   | takes an void pointer to an         |
  * |             void *opts)            | individual, and should return an    |
  * |                                    | integer value that indicates how    |
  * |                                    | strong (good / improoved / near by  |

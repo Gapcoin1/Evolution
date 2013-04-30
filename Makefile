@@ -34,6 +34,17 @@ PARALLEL_TEST_BIN_O2	= $(BIN)/test-parallel-O2
 PARALLEL_TEST_BIN_O3	= $(BIN)/test-parallel-O3
 
 #
+# +----------+
+# | TSP Test |
+# +----------+
+#
+TSP_TEST_SRC			= $(TEST)/tsp.c
+TSP_TEST_OBJ			= $(BIN)/tsp.o
+TSP_TEST_BIN			= $(BIN)/tsp
+TSP_TEST_BIN_O2	  = $(BIN)/tsp-O2
+TSP_TEST_BIN_O3	  = $(BIN)/tsp-O3
+
+#
 # +---------------------+
 # | Onely Mutation Test |
 # +---------------------+
@@ -95,6 +106,24 @@ parallel-test-O3: clean_obj evolution-O3
 	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_TEST_SRC) -o $(PARALLEL_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ) 											\
 				-o $(PARALLEL_TEST_BIN_O3)
+
+tsp-test: evolution
+	@echo "Make tsp-test"
+	$(CC) $(CFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ)											\
+				-o $(TSP_TEST_BIN)
+
+tsp-test-O2: clean_obj evolution-O2
+	@echo "Make tsp-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
+				-o $(TSP_TEST_BIN_O2)
+
+tsp-test-O3: clean_obj evolution-O3
+	@echo "Make tsp-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
+				-o $(TSP_TEST_BIN_O3)
 
 test-only-mutate: evolution
 	@echo "Make test-only-mutate"
