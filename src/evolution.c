@@ -331,6 +331,7 @@ static char ev_flags_invalid(uint64_t flags) {
   
   return tflags != EV_UREC                           &&
          tflags != (EV_UREC|EV_UMUT)                 &&
+         tflags != (EV_UMUT|EV_AMUT)                 &&
          tflags != (EV_UREC|EV_UMUT|EV_AMUT)         &&
          tflags != (EV_UREC|EV_KEEP)                 &&
          tflags != (EV_UREC|EV_UMUT|EV_KEEP)         &&

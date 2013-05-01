@@ -7,6 +7,76 @@
 
 #include "tsp.h"
 
+/* functions */
+TSP *new_tsp(uint32_t length);
+void init_tsp_ev(TSPEvolution *tsp_ev, TSP *tsp);
+void *init_tsp_route(void *opts);
+void clone_tsp_route(void *v_dst, void *v_src, void *opts);
+void free_tsp_route(void *v_src, void *opts);
+void mutate_tsp_route(Individual *iv, void *opts);
+int64_t tsp_route_length(Individual *iv, void *opts);
+void recombinate_tsp_route(Individual *src_1,
+                            Individual *src_2,
+                            Individual *dst,
+                            void *opts);
+
+/**
+ * main method to start the tsp test
+ */
+int main(int argc, char *argv[]) {
+  
+  /* cmd args check */
+  if (argc != 4) {
+    printf("%s <num citys> <generation limit> <num threads>\n", argv[0]);
+    exit(1);
+  }
+
+  int n_threads       = atoi(argv[3]);
+  TSP *tsp            = new_tsp(atoi(argv[1]));
+  TSPEvolution **opts = malloc(sizeof(TSPEvolution *) * n_threads);
+
+
+  int i;
+  for (i = 0; i < n_threads; i++) {
+    opts[i] = malloc(sizeof(TSPEvolution));
+    init_tsp_ev(opts[i], tsp);
+  }
+
+  EvInitArgs args;
+
+  args.init_iv              = init_tsp_route;
+  args.clone_iv             = clone_tsp_route;
+  args.free_iv              = free_tsp_route;
+  args.mutate               = mutate_tsp_route;
+  args.fitness              = tsp_route_length;
+  args.recombinate          = recombinate_tsp_route;
+  args.continue_ev          = NULL;
+  args.population_size      = 100;
+  args.generation_limit     = atoi(argv[2]);
+  args.mutation_propability = 0.1;
+  args.death_percentage     = 0.5;
+  args.opts                 = (void **) opts;
+  args.num_threads          = n_threads;
+  args.flags                = EV_UREC|EV_KEEP|EV_VEB2;
+
+  Individual *best;
+  Evolution *ev = new_evolution(&args);
+  best = evolute(ev);
+  TSPRoute *route = best->iv;
+
+  printf("shortest found path: %" PRIi64 "\n", best->fitness);
+
+  uint32_t j;
+  for (j = 0; j < route->length; j++)
+    printf("[%3" PRIu32 "][%3" PRIu32 "](%3" PRIu32 ")\n",
+           route->roads[j].city_a,
+           route->roads[j].city_b,
+           route->roads[j].distance);
+
+  return 0;
+
+}
+
 /**
  * creats an random TSP with a given length
  */
@@ -27,7 +97,7 @@ TSP *new_tsp(uint32_t length) {
 
   for (x = 0; x < length; x++) {
     for (y = x + 1; y < length; y++) {
-      tsp->distances[x][y] = tsp->distances[y][x] = rand();
+      tsp->distances[x][y] = tsp->distances[y][x] = rand() % length;  
     }
   }
 
@@ -42,9 +112,13 @@ void init_tsp_ev(TSPEvolution *tsp_ev, TSP *tsp) {
   /* soft copy (only length) */
   tsp_ev->tsp = *tsp;
 
+  ARY_INIT(uint32_t, tsp_ev->citys, tsp->length);
+  ARY_INIT(uint32_t, tsp_ev->tmp, tsp->length);
+
   uint32_t i;
   for (i = 0; i < tsp->length; i++)
     ARY_ADD(tsp_ev->citys, i);
+  
 }
 
 /**
@@ -123,6 +197,15 @@ void *init_tsp_route(void *opts) {
    */
   for (i = 0; i < route->length; i++)
     route->citys[route->roads[i].city_a] = &route->roads[i];
+
+  // TODO remove
+  uint32_t j;
+  for (j = 0; j < route->length; j++)
+    printf("[%3" PRIu32 "][%3" PRIu32 "](%3" PRIu32 ")\n",
+           route->roads[j].city_a,
+           route->roads[j].city_b,
+           route->roads[j].distance);
+  // TODO remove
 
   return route;
 }
@@ -265,13 +348,16 @@ void recombinate_tsp_route(Individual *src_1,
                             Individual *dst,
                             void *opts) {
   
-  (void) opts;
-  TSPRoute *route_a   = src_1->iv;
-  TSPRoute *route_b   = src_2->iv;
-  TSPRoute *new_route = dst->iv;
+  TSPEvolution *tsp_ev = opts;
+  TSPRoute *route_a    = src_1->iv;
+  TSPRoute *route_b    = src_2->iv;
+  TSPRoute *new_route  = dst->iv;
 
   uint32_t city_a, city_b, distance;
   city_a = route_a->roads[0].city_a; /* start city */
+
+  /* clear tmp */
+  ARY_SET_NULL(tsp_ev->tmp);
 
   /**
    * create a new TSPRoute by selecting the next city_b with
@@ -279,16 +365,38 @@ void recombinate_tsp_route(Individual *src_1,
    */
   uint32_t i;
   for (i = 0; i < new_route->length; i++) {
+
+    /**
+     * every used city of the new route
+     * will be setted to 1
+     */
+    ARY_AT(tsp_ev->tmp, city_a) = 1;
     
-    /* choose next city_b */
-    if (route_a->citys[city_a]->distance <
-        route_b->citys[city_a]->distance) {
-      
-      city_b   = route_a->citys[city_a]->city_b;
-      distance = route_a->citys[city_a]->distance;
-    } else {
+    /**
+     * if city_b of route_a is already used 
+     * we must take city_b form route_b 
+     */
+    if (ARY_AT(tsp_ev->tmp, route_a->citys[city_a]->city_b)) {
+
       city_b   = route_b->citys[city_a]->city_b;
       distance = route_b->citys[city_a]->distance;
+    } else {
+
+      /**
+       * if also city_b of route_b is not used 
+       * we can choose the better city 
+       * else whe have to take the city_b of route_a
+       */
+      if (ARY_AT(tsp_ev->tmp, route_b->citys[city_a]->city_b) == 0 &&
+          route_a->citys[city_a]->distance <
+          route_b->citys[city_a]->distance) {
+        
+        city_b   = route_a->citys[city_a]->city_b;
+        distance = route_a->citys[city_a]->distance;
+      } else {
+        city_b   = route_b->citys[city_a]->city_b;
+        distance = route_b->citys[city_a]->distance;
+      }
     }
 
     /* ad the better road to the new route */
@@ -301,5 +409,7 @@ void recombinate_tsp_route(Individual *src_1,
     city_a = city_b;
   }
 }
+
+//TODO sicherstellen das beim mutieren und recombiniren gezogene städte nicht nochmal gezogen werden
 
 #endif /* __TSP__ */
