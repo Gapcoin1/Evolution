@@ -14,11 +14,14 @@ void *init_tsp_route(void *opts);
 void clone_tsp_route(void *v_dst, void *v_src, void *opts);
 void free_tsp_route(void *v_src, void *opts);
 void mutate_tsp_route(Individual *iv, void *opts);
+void mutate_tsp_route_reinit(Individual *iv, void *opts);
+void mutate_tsp_route_switch(Individual *iv, void *opts);
 int64_t tsp_route_length(Individual *iv, void *opts);
 void recombinate_tsp_route(Individual *src_1,
                             Individual *src_2,
                             Individual *dst,
                             void *opts);
+char tsp_continue_ev(Evolution *const ev);
 
 /**
  * main method to start the tsp test
@@ -26,13 +29,15 @@ void recombinate_tsp_route(Individual *src_1,
 int main(int argc, char *argv[]) {
   
   /* cmd args check */
-  if (argc != 4) {
-    printf("%s <num citys> <generation limit> <num threads>\n", argv[0]);
+  if (argc != 5) {
+    printf("%s <num citys> <generation limit> <num generations> <num threads>\n", argv[0]);
     exit(1);
   }
 
-  int n_threads       = atoi(argv[3]);
-  TSP *tsp            = new_tsp(atoi(argv[1]));
+  int n_threads       = atoi(argv[4]);
+  int n_generations   = atoi(argv[3]);
+  int n_citys         = atoi(argv[1]);
+  TSP *tsp            = new_tsp(n_citys);
   TSPEvolution **opts = malloc(sizeof(TSPEvolution *) * n_threads);
 
 
@@ -50,28 +55,67 @@ int main(int argc, char *argv[]) {
   args.mutate               = mutate_tsp_route;
   args.fitness              = tsp_route_length;
   args.recombinate          = recombinate_tsp_route;
-  args.continue_ev          = NULL;
-  args.population_size      = 100;
+  args.continue_ev          = tsp_continue_ev;
+  args.population_size      = n_generations;
   args.generation_limit     = atoi(argv[2]);
   args.mutation_propability = 0.1;
   args.death_percentage     = 0.5;
   args.opts                 = (void **) opts;
   args.num_threads          = n_threads;
-  args.flags                = EV_UREC|EV_KEEP|EV_VEB2;
+  args.flags                = EV_UMUT|EV_AMUT|EV_ABRT|EV_KEEP|EV_VEB1;
 
   Individual *best;
   Evolution *ev = new_evolution(&args);
   best = evolute(ev);
   TSPRoute *route = best->iv;
 
+  if (n_citys <= 40) {
+
+    uint32_t x, y;
+    for (x = 0; x < tsp->length; x++) {
+      for (y = 0; y < tsp->length; y++) {
+        printf("%3u", tsp->distances[x][y]);  
+      }
+      printf("\n");
+    }
+  }
+
   printf("shortest found path: %" PRIi64 "\n", best->fitness);
 
-  uint32_t j;
-  for (j = 0; j < route->length; j++)
-    printf("[%3" PRIu32 "][%3" PRIu32 "](%3" PRIu32 ")\n",
-           route->roads[j].city_a,
-           route->roads[j].city_b,
-           route->roads[j].distance);
+  /**
+   * calculate the improvve in comparison with an random route
+   */
+  uint32_t rand_fitness = 0;
+  for (i = 0; i < n_generations; i++) {
+    Individual iv;
+    iv.iv = init_tsp_route(opts[0]);
+    rand_fitness += tsp_route_length(&iv, opts[0]);
+    free_tsp_route(iv.iv, opts[0]);
+  }
+  rand_fitness /= n_generations;
+
+  printf("improov in comparison to an average "
+         "random route (%" PRIu32 "): %f\n",
+         rand_fitness,
+         (double) best->fitness / (double) rand_fitness);
+
+  if (n_citys <= 40) {
+
+    uint32_t x, y;
+    for (x = 0; x < tsp->length; x++) {
+      for (y = 0; y < tsp->length; y++) {
+        printf("%3u", tsp->distances[x][y]);  
+      }
+      printf("\n");
+    }
+
+    uint32_t j;
+    for (j = 0; j < route->length; j++)
+      printf("[%3" PRIu32 "][%3" PRIu32 "](%3" PRIu32 ")\n",
+             route->roads[j].city_a,
+             route->roads[j].city_b,
+             route->roads[j].distance);
+  }
 
   return 0;
 
@@ -95,10 +139,32 @@ TSP *new_tsp(uint32_t length) {
     tsp->distances[x][x] = 0;
   }
 
+  /* fill tsp with random distances */
   for (x = 0; x < length; x++) {
     for (y = x + 1; y < length; y++) {
-      tsp->distances[x][y] = tsp->distances[y][x] = rand() % length;  
+      tsp->distances[x][y] = tsp->distances[y][x] = 1 + (rand() % length);  
     }
+  }
+
+  /**
+   * calculatze a lower barrier
+   * by adding all local optimal distances
+   * together, a optimal solutan cann be better
+   * as all local solution, but an optimal solution
+   * dosn't neet to include all local optimal distances
+   * so this is possible a barrier never reatched
+   */
+  tsp->lower_barrier = 0;
+  for (x = 0; x < length; x++) {
+
+    uint32_t min = RAND_MAX;
+    for (y = 0; y < length; y++) {
+      if (x == y) continue;
+
+      if (min > tsp->distances[x][y])
+        min = tsp->distances[x][y];
+    }
+    tsp->lower_barrier += min;
   }
 
   return tsp;
@@ -111,6 +177,7 @@ void init_tsp_ev(TSPEvolution *tsp_ev, TSP *tsp) {
 
   /* soft copy (only length) */
   tsp_ev->tsp = *tsp;
+  tsp_ev->mut_size_reduce = 0.0;
 
   ARY_INIT(uint32_t, tsp_ev->citys, tsp->length);
   ARY_INIT(uint32_t, tsp_ev->tmp, tsp->length);
@@ -198,15 +265,6 @@ void *init_tsp_route(void *opts) {
   for (i = 0; i < route->length; i++)
     route->citys[route->roads[i].city_a] = &route->roads[i];
 
-  // TODO remove
-  uint32_t j;
-  for (j = 0; j < route->length; j++)
-    printf("[%3" PRIu32 "][%3" PRIu32 "](%3" PRIu32 ")\n",
-           route->roads[j].city_a,
-           route->roads[j].city_b,
-           route->roads[j].distance);
-  // TODO remove
-
   return route;
 }
 
@@ -248,8 +306,61 @@ void free_tsp_route(void *v_src, void *opts) {
   free(src);
 }
 
+/**  sets the distance of the road 
+ * at the given index from the given TSP
+ */
+#define TSP_SET_DISTANCE(ROUTE, I, TSP)                                     \
+  (ROUTE).roads[I].distance = (TSP).distances[(ROUTE).roads[I].city_a]      \
+                                             [(ROUTE).roads[I].city_b]
+
+void mutate_tsp_route(Individual *iv, void *opts) {
+  
+  if (((TSPEvolution *) opts)->mut_size_reduce <= 4.5)
+    mutate_tsp_route_reinit(iv, opts);
+  else
+    mutate_tsp_route_switch(iv, opts);
+
+}
+
 /**
- * mutate an given TSPRoute TODO add a mutate function which switches two citys in the route (smal mutate)
+ * mutate an given TSPRoute
+ * by switching two random citys
+ *
+ * complexity is in O(1) 
+ * n = route->length
+ */
+void mutate_tsp_route_switch(Individual *iv, void *opts) {
+
+  TSPEvolution *tsp_ev = opts;
+  TSPRoute     *route = iv->iv;
+ 
+  uint32_t start = rand() % (route->length - 1);
+  uint32_t end   = 1 + (rand() % (route->length - 1));
+  uint32_t tmp;
+
+  /* switch citys */
+  tmp                          = route->roads[end - 1].city_b;
+  route->roads[end - 1].city_b = route->roads[start].city_b;
+  route->roads[start].city_b   = tmp;
+
+  tmp                            = route->roads[end].city_a;
+  route->roads[end].city_a       = route->roads[start + 1].city_a;
+  route->roads[start + 1].city_a = tmp;
+
+  /* reset distances */
+  TSP_SET_DISTANCE(*route, start, tsp_ev->tsp);
+  TSP_SET_DISTANCE(*route, start + 1, tsp_ev->tsp);
+  TSP_SET_DISTANCE(*route, end, tsp_ev->tsp);
+  TSP_SET_DISTANCE(*route, end - 1, tsp_ev->tsp);
+  
+  //TODO remove roads pointer array and recombinate not used!!
+}
+
+/**
+ * mutate an given TSPRoute 
+ * by reinitalize an random length part
+ *
+ *                               TODO add a mutate function which switches two citys in the route (smal mutate)
  *                               and optional searches the best two citys to switch
  *                               and if the can be no improoves because of switching uses normal mutate with smal path
  *                               first normal mutate paths gest smaller till it has length 3 thne switch mutate is useds
@@ -258,7 +369,7 @@ void free_tsp_route(void *v_src, void *opts) {
  * complexity is in O(n) 
  * n = route->length
  */
-void mutate_tsp_route(Individual *iv, void *opts) {
+void mutate_tsp_route_reinit(Individual *iv, void *opts) {
 
   TSPEvolution *tsp_ev = opts;
   TSPRoute     *route = iv->iv;
@@ -270,10 +381,14 @@ void mutate_tsp_route(Individual *iv, void *opts) {
    * wenn need min three roads because start(city_a) of road 0
    * and end(city_b) of last road are fixed
    */
-  uint32_t length = 3 + (rand() % (route->length - 3)); 
+  int32_t length = (rand() % (1 + route->length - 3)); 
+  length -= (int32_t) (((double) (rand() % (1 + route->length - 3))) *
+                        tsp_ev->mut_size_reduce);
+  if (length <= 3)
+    length = 3;
 
   /* chose random start position */
-  uint32_t start = rand() % (route->length - length);
+  uint32_t start = rand() % (1 + (route->length - length));
   uint32_t end   = start + length - 1;
 
   /**
@@ -281,7 +396,7 @@ void mutate_tsp_route(Individual *iv, void *opts) {
    * start and end citys are fix
    */
   uint32_t i;
-  for (i = start; i < end - 1; i++)
+  for (i = start; i < end; i++)
     ARY_ADD(tsp_ev->tmp, route->roads[i].city_b);
 
 
@@ -314,8 +429,10 @@ void mutate_tsp_route(Individual *iv, void *opts) {
   /**
    * for the last road city_b is fix
    */
+  city_b = route->roads[end].city_b;
   route->roads[end].city_a   = city_a;
   route->roads[end].distance = tsp_ev->tsp.distances[city_a][city_b];
+
 }
 
 /**
@@ -410,6 +527,46 @@ void recombinate_tsp_route(Individual *src_1,
   }
 }
 
-//TODO sicherstellen das beim mutieren und recombiniren gezogene städte nicht nochmal gezogen werden
+/**
+ * continue_ev function which controls the art of 
+ * mutation an gives extra output
+ */
+char tsp_continue_ev(Evolution *const ev) {
+  
+  TSP *tsp = &((TSPEvolution *) *ev->opts)->tsp;
+
+  /* if optimal route is found stop calculation */
+  if (ev->population[0]->fitness == tsp->lower_barrier)
+    return 0;
+
+
+  /* if no improoves reduce mutation size */
+  if (ev->info.improovs == 0) {
+    
+    int i;
+    TSPEvolution *tmp;
+    for (i = 0; i < ev->num_threads; i++) {
+      tmp = ev->opts[i];
+
+      if (tmp->mut_size_reduce < 4.5)
+        tmp->mut_size_reduce += 0.01;
+    }
+
+
+  }
+
+
+  /* print status informations */
+  printf("\33[2K\rimproovs %3d -> %8.5f%%   best fitness %10li  "
+         "lower barrier: %" PRIu32 "  mut-%%: %f \n",              
+         ev->info.improovs,
+         ((ev->info.improovs / (double) ev->deaths) * 100.0),
+         ev->population[0]->fitness,
+         tsp->lower_barrier,
+         ((TSPEvolution *) *ev->opts)->mut_size_reduce);
+
+  return 1;
+}
+
 
 #endif /* __TSP__ */

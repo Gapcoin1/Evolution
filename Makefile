@@ -115,13 +115,13 @@ tsp-test: evolution
 
 tsp-test-O2: clean_obj evolution-O2
 	@echo "Make tsp-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) -O2 $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
 				-o $(TSP_TEST_BIN_O2)
 
 tsp-test-O3: clean_obj evolution-O3
 	@echo "Make tsp-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) -O3 $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
 				-o $(TSP_TEST_BIN_O3)
 

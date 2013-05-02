@@ -41,6 +41,7 @@ typedef struct {
   uint32_t length;        /* the number of citys in this TSP */
   uint32_t **distances;   /* the distance matrix */
   uint32_t start;         /* the start city */
+  uint32_t lower_barrier; /* the lower barrier of this TSP */
 } TSP;
 
 /**
@@ -51,6 +52,7 @@ typedef struct {
   TSP tsp;                  /* the tsp */
   UI32Ary citys;            /* indexes of all citys */
   UI32Ary tmp;              /* temp array for calculation */
+  double  mut_size_reduce;  /* pecentage to controll the mutation size */
 } TSPEvolution;
 
 #endif /* __TSP_H__ */
