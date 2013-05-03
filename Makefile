@@ -27,11 +27,34 @@ EVOLUTION_OBJ = $(BIN)/evolution.o
 # | Parallel Test |
 # +---------------+
 #
+PARALLEL_PTHREAD_TEST_SRC			= $(TEST)/test-parallel.c
+PARALLEL_PTHREAD_TEST_OBJ			= $(BIN)/test-parallel_pthread.o
+PARALLEL_PTHREAD_TEST_BIN			= $(BIN)/test-parallel_pthread
+PARALLEL_PTHREAD_TEST_BIN_O2	= $(BIN)/test-parallel_pthread-O2
+PARALLEL_PTHREAD_TEST_BIN_O3	= $(BIN)/test-parallel_pthread-O3
+
+#
+# +-----------------------+
+# | Parallel Test PThread |
+# +-----------------------+
+#
 PARALLEL_TEST_SRC			= $(TEST)/test-parallel.c
 PARALLEL_TEST_OBJ			= $(BIN)/test-parallel.o
 PARALLEL_TEST_BIN			= $(BIN)/test-parallel
 PARALLEL_TEST_BIN_O2	= $(BIN)/test-parallel-O2
 PARALLEL_TEST_BIN_O3	= $(BIN)/test-parallel-O3
+
+
+#
+# +------------------+
+# | TSP Test PThread |
+# +------------------+
+#
+TSP_PTHREAD_TEST_SRC			= $(TEST)/tsp.c
+TSP_PTHREAD_TEST_OBJ			= $(BIN)/tsp_pthread.o
+TSP_PTHREAD_TEST_BIN			= $(BIN)/tsp_pthread
+TSP_PTHREAD_TEST_BIN_O2	  = $(BIN)/tsp_pthread-O2
+TSP_PTHREAD_TEST_BIN_O3	  = $(BIN)/tsp_pthread-O3
 
 #
 # +----------+
@@ -89,42 +112,89 @@ evolution-debug: utils
 	@echo "Make Evolution with debugging options"
 	$(CC) $(CFLAGS) $(DBFLAGS) $(EVOLUTION_SRC) -o $(EVOLUTION_OBJ)
 
+parallel-test: CFLAGS += -D NO_OUTPUT
 parallel-test: evolution
 	@echo "Make parallel-test"
 	$(CC) $(CFLAGS) $(PARALLEL_TEST_SRC) -o $(PARALLEL_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ)											\
 				-o $(PARALLEL_TEST_BIN)
 
+parallel-test-O2: CFLAGS += -D NO_OUTPUT
 parallel-test-O2: clean_obj evolution-O2
 	@echo "Make parallel-test O2"
 	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_TEST_SRC) -o $(PARALLEL_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ) 											\
 				-o $(PARALLEL_TEST_BIN_O2)
 
+parallel-test-O3: CFLAGS += -D NO_OUTPUT
 parallel-test-O3: clean_obj evolution-O3
 	@echo "Make parallel-test O3"
 	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_TEST_SRC) -o $(PARALLEL_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ) 											\
 				-o $(PARALLEL_TEST_BIN_O3)
 
+parallel_pthread-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
+parallel_pthread-test: evolution
+	@echo "Make parallel_pthread-test"
+	$(CC) $(CFLAGS) $(PARALLEL_PTHREAD_TEST_SRC) -o $(PARALLEL_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_TEST_OBJ)											\
+				-o $(PARALLEL_PTHREAD_TEST_BIN)
+
+parallel_pthread-test-O2: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
+parallel_pthread-test-O2: clean_obj evolution-O2
+	@echo "Make parallel_pthread-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_PTHREAD_TEST_SRC) -o $(PARALLEL_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_TEST_OBJ) 											\
+				-o $(PARALLEL_PTHREAD_TEST_BIN_O2)
+
+parallel_pthread-test-O3: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
+parallel_pthread-test-O3: clean_obj evolution-O3
+	@echo "Make parallel_pthread-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_PTHREAD_TEST_SRC) -o $(PARALLEL_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_TEST_OBJ) 											\
+				-o $(PARALLEL_PTHREAD_TEST_BIN_O3)
+
+tsp-test: CFLAGS += -D NO_OUTPUT
 tsp-test: evolution
 	@echo "Make tsp-test"
 	$(CC) $(CFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ)											\
 				-o $(TSP_TEST_BIN)
 
+tsp-test-O2: CFLAGS += -D NO_OUTPUT
 tsp-test-O2: clean_obj evolution-O2
 	@echo "Make tsp-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) -O2 $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
 				-o $(TSP_TEST_BIN_O2)
 
+tsp-test-O3: CFLAGS += -D NO_OUTPUT
 tsp-test-O3: clean_obj evolution-O3
 	@echo "Make tsp-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) -O3 $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
 				-o $(TSP_TEST_BIN_O3)
 
+tsp_pthread-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
+tsp_pthread-test: evolution
+	@echo "Make tsp_pthread-test"
+	$(CC) $(CFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ)											\
+				-o $(TSP_TEST_BIN)
+
+tsp_pthread-test-O2: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
+tsp_pthread-test-O2: clean_obj evolution-O2
+	@echo "Make tsp_pthread-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
+				-o $(TSP_TEST_BIN_O2)
+
+tsp_pthread-test-O3: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
+tsp_pthread-test-O3: clean_obj evolution-O3
+	@echo "Make tsp_pthread-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
+				-o $(TSP_TEST_BIN_O3)
 test-only-mutate: evolution
 	@echo "Make test-only-mutate"
 	$(CC) $(CFLAGS) $(O_MUTATE_TEST_SRC) -o $(O_MUTATE_TEST_OBJ)

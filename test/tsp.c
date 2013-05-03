@@ -29,9 +29,19 @@ char tsp_continue_ev(Evolution *const ev);
 int main(int argc, char *argv[]) {
   
   /* cmd args check */
-  if (argc != 5) {
-    printf("%s <num citys> <generation limit> <num generations> <num threads>\n", argv[0]);
+  if (argc != 6) {
+    printf("%s <num citys> <generation limit> <num generations> "
+            "<num threads> <verbose(0-3)>\n", argv[0]);
     exit(1);
+  }
+
+  int verbose = EV_VEB0;
+
+  switch (atoi(argv[3])) {
+    case 1:   verbose = EV_VEB1; break;
+    case 2:   verbose = EV_VEB2; break;
+    case 3:   verbose = EV_VEB3; break;
+    default : verbose = EV_VEB0; 
   }
 
   int n_threads       = atoi(argv[4]);
@@ -62,7 +72,7 @@ int main(int argc, char *argv[]) {
   args.death_percentage     = 0.5;
   args.opts                 = (void **) opts;
   args.num_threads          = n_threads;
-  args.flags                = EV_UMUT|EV_AMUT|EV_ABRT|EV_KEEP|EV_VEB1;
+  args.flags                = EV_UMUT|EV_AMUT|EV_ABRT|EV_KEEP|verbose;
 
   Individual *best;
   Evolution *ev = new_evolution(&args);
@@ -80,6 +90,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  #ifndef NO_OUTPUT
   printf("shortest found path: %" PRIi64 "\n", best->fitness);
 
   /**
@@ -116,6 +127,9 @@ int main(int argc, char *argv[]) {
              route->roads[j].city_b,
              route->roads[j].distance);
   }
+  #else
+  (void) route;
+  #endif
 
   return 0;
 
@@ -556,6 +570,7 @@ char tsp_continue_ev(Evolution *const ev) {
   }
 
 
+  #ifndef NO_OUTPUT
   /* print status informations */
   printf("\33[2K\rimproovs %3d -> %8.5f%%   best fitness %10li  "
          "lower barrier: %" PRIu32 "  mut-%%: %f \n",              
@@ -564,6 +579,7 @@ char tsp_continue_ev(Evolution *const ev) {
          ev->population[0]->fitness,
          tsp->lower_barrier,
          ((TSPEvolution *) *ev->opts)->mut_size_reduce);
+  #endif
 
   return 1;
 }

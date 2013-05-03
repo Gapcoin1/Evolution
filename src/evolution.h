@@ -9,6 +9,21 @@
 #include "C-Utils/Thread-Clients/src/thread-client.h"
 
 /**
+ * Macro for changing TC to pthread
+ * 
+ * its seams to depending on the specific
+ * work the evolution gets if thread clients
+ * or pthread syscalls are faster
+ */
+#ifdef NO_THREAD_CLIENTS
+#define TClient pthread_t
+#define tc_add_func(THREAD, FUNCTION, ARGS)     \
+  pthread_create(THREAD, NULL, FUNCTION, ARGS)
+#define tc_join(THREAD) pthread_join(*(THREAD), NULL);
+#define init_thread_client(THREAD) (void) THREAD
+#endif
+
+/**
  * Type definition for the Evolution struct
  */
 typedef struct Evolution Evolution;
