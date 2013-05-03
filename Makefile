@@ -178,23 +178,23 @@ tsp-test-O3: clean_obj evolution-O3
 tsp_pthread-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
 tsp_pthread-test: evolution
 	@echo "Make tsp_pthread-test"
-	$(CC) $(CFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ)											\
-				-o $(TSP_TEST_BIN)
+	$(CC) $(CFLAGS) $(TSP_PTHREAD_TEST_SRC) -o $(TSP_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_PTHREAD_TEST_OBJ)											\
+				-o $(TSP_PTHREAD_TEST_BIN)
 
 tsp_pthread-test-O2: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
 tsp_pthread-test-O2: clean_obj evolution-O2
 	@echo "Make tsp_pthread-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
-				-o $(TSP_TEST_BIN_O2)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_PTHREAD_TEST_SRC) -o $(TSP_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_PTHREAD_TEST_OBJ) 											\
+				-o $(TSP_PTHREAD_TEST_BIN_O2)
 
 tsp_pthread-test-O3: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
 tsp_pthread-test-O3: clean_obj evolution-O3
 	@echo "Make tsp_pthread-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
-				-o $(TSP_TEST_BIN_O3)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_PTHREAD_TEST_SRC) -o $(TSP_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_PTHREAD_TEST_OBJ) 											\
+				-o $(TSP_PTHREAD_TEST_BIN_O3)
 test-only-mutate: evolution
 	@echo "Make test-only-mutate"
 	$(CC) $(CFLAGS) $(O_MUTATE_TEST_SRC) -o $(O_MUTATE_TEST_OBJ)
