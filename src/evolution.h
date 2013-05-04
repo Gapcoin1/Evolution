@@ -302,11 +302,12 @@ char void_ptr_equal(void *a, void *b);
  * Struct holding information for the thread clients
  */
 typedef struct {
-  Evolution *const ev;    /* pointer to the current Evolution struct */
-  const int index;       /* index of the current working thread     */
-  int start;              /* start and end index for calculationg of */ 
-  int end;                /* the current working thread              */
-  int improovs;           /* improovs of the current thread          */
+  Evolution *const ev;    /* pointer to the current Evolution struct    */
+  const int index;        /* index of the current working thread        */
+  const int start;        /* start and end index for repleacing         */ 
+  const int end;          /* individuals of the current working thread  */ //TODO better comment start end end ar te arre in which the new individuals wil be born into  parallel_end and parallel_start are the overall arre where individuals will be repleaced (update descriptions)  changed parallel start and end names into overall start overall end
+  int improovs;           /* improovs of the current thread             */
+  char waiting;           /* indecates if this thread is waiting        */
   // TODO add the opt ptr for the current index (at init) so we can scip the opt[index]
 } EvThreadArgs;
 
@@ -388,6 +389,9 @@ typedef struct {
  * |                                    |                                     |
  * | EvolutionInfo info                 | additional information during an    |
  * |                                    | evolution                           |
+ * |                                    |                                     |
+ * | char threads_running               | indecates wether threads should     |
+ * |                                    | keep working or not                 |
  * +------------------------------------+-------------------------------------+
  * 
  * Note: many values are const like opts (an const pointer to an array of
@@ -430,6 +434,7 @@ struct Evolution {
   const int      i_mut_propability;
   TClient *const thread_clients;
   EvThreadArgs   *const thread_args;
+  char           threads_running;
   EvolutionInfo  info;
 };
 
