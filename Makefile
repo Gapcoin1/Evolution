@@ -23,9 +23,9 @@ EVOLUTION_SRC = $(SRC)/evolution.c
 EVOLUTION_OBJ = $(BIN)/evolution.o
 
 #
-# +---------------+
-# | Parallel Test |
-# +---------------+
+# +-----------------------+
+# | Parallel Test PThread |
+# +-----------------------+
 #
 PARALLEL_PTHREAD_TEST_SRC			= $(TEST)/test-parallel.c
 PARALLEL_PTHREAD_TEST_OBJ			= $(BIN)/test-parallel_pthread.o
@@ -34,9 +34,31 @@ PARALLEL_PTHREAD_TEST_BIN_O2	= $(BIN)/test-parallel_pthread-O2
 PARALLEL_PTHREAD_TEST_BIN_O3	= $(BIN)/test-parallel_pthread-O3
 
 #
-# +-----------------------+
-# | Parallel Test PThread |
-# +-----------------------+
+# +---------------------------------+
+# | Parallel Test PThread Less Sync |
+# +---------------------------------+
+#
+PARALLEL_PTHREAD_LESS_SYNC_TEST_SRC			= $(TEST)/test-parallel.c
+PARALLEL_PTHREAD_LESS_SYNC_TEST_OBJ			= $(BIN)/test-parallel_pthread_less_sync.o
+PARALLEL_PTHREAD_LESS_SYNC_TEST_BIN			= $(BIN)/test-parallel_pthread_less_sync
+PARALLEL_PTHREAD_LESS_SYNC_TEST_BIN_O2	= $(BIN)/test-parallel_pthread_less_sync-O2
+PARALLEL_PTHREAD_LESS_SYNC_TEST_BIN_O3	= $(BIN)/test-parallel_pthread_less_sync-O3
+
+#
+# +-------------------------+
+# | Parallel Test Less Sync |
+# +-------------------------+
+#
+PARALLEL_LESS_SYNC_TEST_SRC			= $(TEST)/test-parallel.c
+PARALLEL_LESS_SYNC_TEST_OBJ			= $(BIN)/test-parallel_less_sync.o
+PARALLEL_LESS_SYNC_TEST_BIN			= $(BIN)/test-parallel_less_sync
+PARALLEL_LESS_SYNC_TEST_BIN_O2	= $(BIN)/test-parallel_less_sync-O2
+PARALLEL_LESS_SYNC_TEST_BIN_O3	= $(BIN)/test-parallel_less_sync-O3
+
+#
+# +---------------+
+# | Parallel Test |
+# +---------------+
 #
 PARALLEL_TEST_SRC			= $(TEST)/test-parallel.c
 PARALLEL_TEST_OBJ			= $(BIN)/test-parallel.o
@@ -44,6 +66,28 @@ PARALLEL_TEST_BIN			= $(BIN)/test-parallel
 PARALLEL_TEST_BIN_O2	= $(BIN)/test-parallel-O2
 PARALLEL_TEST_BIN_O3	= $(BIN)/test-parallel-O3
 
+
+#
+# +----------------------------+
+# | TSP Test PThread Less Sync |
+# +----------------------------+
+#
+TSP_LESS_SYNC_PTHREAD_TEST_SRC			= $(TEST)/tsp.c
+TSP_LESS_SYNC_PTHREAD_TEST_OBJ			= $(BIN)/tsp_less_sync_pthread.o
+TSP_LESS_SYNC_PTHREAD_TEST_BIN			= $(BIN)/tsp_less_sync_pthread
+TSP_LESS_SYNC_PTHREAD_TEST_BIN_O2	  = $(BIN)/tsp_less_sync_pthread-O2
+TSP_LESS_SYNC_PTHREAD_TEST_BIN_O3	  = $(BIN)/tsp_less_sync_pthread-O3
+
+#
+# +--------------------+
+# | TSP Test Less Sync |
+# +--------------------+
+#
+TSP_LESS_SYNC_TEST_SRC			= $(TEST)/tsp.c
+TSP_LESS_SYNC_TEST_OBJ			= $(BIN)/tsp_less_sync.o
+TSP_LESS_SYNC_TEST_BIN			= $(BIN)/tsp_less_sync
+TSP_LESS_SYNC_TEST_BIN_O2	  = $(BIN)/tsp_less_sync-O2
+TSP_LESS_SYNC_TEST_BIN_O3	  = $(BIN)/tsp_less_sync-O3
 
 #
 # +------------------+
@@ -133,6 +177,55 @@ parallel-test-O3: clean_obj evolution-O3
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ) 											\
 				-o $(PARALLEL_TEST_BIN_O3)
 
+parallel_less_sync-test-verbose: CFLAGS += -D LESS_SYNC
+parallel_less_sync-test-verbose: evolution
+	@echo "Make parallel_less_sync-test"
+	$(CC) $(CFLAGS) $(PARALLEL_LESS_SYNC_TEST_SRC) -o $(PARALLEL_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_LESS_SYNC_TEST_OBJ)											\
+				-o $(PARALLEL_LESS_SYNC_TEST_BIN)
+
+parallel_less_sync-test: CFLAGS += -D NO_OUTPUT -D LESS_SYNC
+parallel_less_sync-test: evolution
+	@echo "Make parallel_less_sync-test"
+	$(CC) $(CFLAGS) $(PARALLEL_LESS_SYNC_TEST_SRC) -o $(PARALLEL_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_LESS_SYNC_TEST_OBJ)											\
+				-o $(PARALLEL_LESS_SYNC_TEST_BIN)
+
+parallel_less_sync-test-O2: CFLAGS += -D NO_OUTPUT -D LESS_SYNC
+parallel_less_sync-test-O2: clean_obj evolution-O2
+	@echo "Make parallel_less_sync-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_LESS_SYNC_TEST_SRC) -o $(PARALLEL_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_LESS_SYNC_TEST_OBJ) 											\
+				-o $(PARALLEL_LESS_SYNC_TEST_BIN_O2)
+
+parallel_less_sync-test-O3: CFLAGS += -D NO_OUTPUT -D LESS_SYNC
+parallel_less_sync-test-O3: clean_obj evolution-O3
+	@echo "Make parallel_less_sync-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_LESS_SYNC_TEST_SRC) -o $(PARALLEL_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_LESS_SYNC_TEST_OBJ) 											\
+				-o $(PARALLEL_LESS_SYNC_TEST_BIN_O3)
+
+parallel_pthread_less_sync-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT -D LESS_SYNC
+parallel_pthread_less_sync-test: evolution
+	@echo "Make parallel_pthread_less_sync-test"
+	$(CC) $(CFLAGS) $(PARALLEL_PTHREAD_LESS_SYNC_TEST_SRC) -o $(PARALLEL_PTHREAD_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_LESS_SYNC_TEST_OBJ)											\
+				-o $(PARALLEL_PTHREAD_LESS_SYNC_TEST_BIN)
+
+parallel_pthread_less_sync-test-O2: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT -D LESS_SYNC
+parallel_pthread_less_sync-test-O2: clean_obj evolution-O2
+	@echo "Make parallel_pthread_less_sync-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_PTHREAD_LESS_SYNC_TEST_SRC) -o $(PARALLEL_PTHREAD_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_LESS_SYNC_TEST_OBJ) 											\
+				-o $(PARALLEL_PTHREAD_LESS_SYNC_TEST_BIN_O2)
+
+parallel_pthread_less_sync-test-O3: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT -D LESS_SYNC
+parallel_pthread_less_sync-test-O3: clean_obj evolution-O3
+	@echo "Make parallel_pthread_less_sync-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_PTHREAD_LESS_SYNC_TEST_SRC) -o $(PARALLEL_PTHREAD_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_LESS_SYNC_TEST_OBJ) 											\
+				-o $(PARALLEL_PTHREAD_LESS_SYNC_TEST_BIN_O3)
+
 parallel_pthread-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
 parallel_pthread-test: evolution
 	@echo "Make parallel_pthread-test"
@@ -153,6 +246,49 @@ parallel_pthread-test-O3: clean_obj evolution-O3
 	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_PTHREAD_TEST_SRC) -o $(PARALLEL_PTHREAD_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_TEST_OBJ) 											\
 				-o $(PARALLEL_PTHREAD_TEST_BIN_O3)
+
+tsp_less_sync-test: CFLAGS += -D NO_OUTPUT -D LESS_SYNC
+tsp_less_sync-test: evolution
+	@echo "Make tsp_less_sync-test"
+	$(CC) $(CFLAGS) $(TSP_LESS_SYNC_TEST_SRC) -o $(TSP_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_LESS_SYNC_TEST_OBJ)											\
+				-o $(TSP_LESS_SYNC_TEST_BIN)
+
+tsp_less_sync-test-O2: CFLAGS += -D NO_OUTPUT -D LESS_SYNC
+tsp_less_sync-test-O2: clean_obj evolution-O2
+	@echo "Make tsp_less_sync-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_LESS_SYNC_TEST_SRC) -o $(TSP_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_LESS_SYNC_TEST_OBJ) 											\
+				-o $(TSP_LESS_SYNC_TEST_BIN_O2)
+
+tsp_less_sync-test-O3: CFLAGS += -D NO_OUTPUT -D LESS_SYNC
+tsp_less_sync-test-O3: clean_obj evolution-O3
+	@echo "Make tsp_less_sync-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_LESS_SYNC_TEST_SRC) -o $(TSP_LESS_SYNC_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_LESS_SYNC_TEST_OBJ) 											\
+				-o $(TSP_LESS_SYNC_TEST_BIN_O3)
+
+tsp_less_sync_pthread-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT -D LESS_SYNC
+tsp_less_sync_pthread-test: evolution
+	@echo "Make tsp_less_sync_pthread-test"
+	$(CC) $(CFLAGS) $(TSP_LESS_SYNC_PTHREAD_TEST_SRC) -o $(TSP_LESS_SYNC_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_LESS_SYNC_PTHREAD_TEST_OBJ)											\
+				-o $(TSP_LESS_SYNC_PTHREAD_TEST_BIN)
+
+tsp_less_sync_pthread-test-O2: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT -D LESS_SYNC
+tsp_less_sync_pthread-test-O2: clean_obj evolution-O2
+	@echo "Make tsp_less_sync_pthread-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_LESS_SYNC_PTHREAD_TEST_SRC) -o $(TSP_LESS_SYNC_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_LESS_SYNC_PTHREAD_TEST_OBJ) 											\
+				-o $(TSP_LESS_SYNC_PTHREAD_TEST_BIN_O2)
+
+tsp_less_sync_pthread-test-O3: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT -D LESS_SYNC
+tsp_less_sync_pthread-test-O3: clean_obj evolution-O3
+	@echo "Make tsp_less_sync_pthread-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_LESS_SYNC_PTHREAD_TEST_SRC) -o $(TSP_LESS_SYNC_PTHREAD_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_LESS_SYNC_PTHREAD_TEST_OBJ) 											\
+				-o $(TSP_LESS_SYNC_PTHREAD_TEST_BIN_O3)
+				
 
 tsp-test: CFLAGS += -D NO_OUTPUT
 tsp-test: evolution
@@ -195,6 +331,7 @@ tsp_pthread-test-O3: clean_obj evolution-O3
 	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_PTHREAD_TEST_SRC) -o $(TSP_PTHREAD_TEST_OBJ)
 	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_PTHREAD_TEST_OBJ) 											\
 				-o $(TSP_PTHREAD_TEST_BIN_O3)
+				
 test-only-mutate: evolution
 	@echo "Make test-only-mutate"
 	$(CC) $(CFLAGS) $(O_MUTATE_TEST_SRC) -o $(O_MUTATE_TEST_OBJ)

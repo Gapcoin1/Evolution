@@ -301,9 +301,18 @@ char void_ptr_equal(void *a, void *b);
 /**
  * Struct holding information for the thread clients
  */
+#ifdef LESS_SYNC
+typedef struct {
+  Evolution *const ev;    /* pointer to the current Evolution struct */
+  const int index;       /* index of the current working thread     */
+  int start;              /* start and end index for calculationg of */ 
+  int end;                /* the current working thread              */
+  int improovs;           /* improovs of the current thread          */
+#else
 typedef const struct {
   Evolution *ev;          /* pointer to the current Evolution struct */
   int index;              /* index of the current working thread     */
+#endif
   // TODO add the opt ptr for the current index (at init) so we can scip the opt[index]
 } EvThreadArgs;
 

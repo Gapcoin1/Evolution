@@ -109,6 +109,14 @@ static inline char ev_equal(Individual *a, Individual *b) {
            (((EV).info.improovs / (double) (EV).deaths) * 100.0),             \
            (EV).population[0]->fitness)
 
+#define EV_THREAD_SAVE_NEW_LINE                                               \
+  do {                                                                        \
+    pthread_mutex_lock(&ev_mutex);                                            \
+    printf("\n");                                                             \
+    pthread_mutex_unlock(&ev_mutex);                                          \
+  } while (0)
+    
+
 
 /**
  * Sadly we have to subvert the type system to initialize an const members
@@ -421,7 +429,7 @@ static void *threadable_init_iv(void *arg) {
       EV_INIT_IV_OUTPUT(i);
 
       if (ev->verbose >= EV_VERBOSE_HIGH)
-        printf("\n");
+        EV_THREAD_SAVE_NEW_LINE;
     }
   }
 
@@ -454,8 +462,24 @@ static inline void ev_recombinate(Evolution *ev) {
     ev->parallel_end   = ev->population_size * 2;
   }
 
+  #ifdef LESS_SYNC
+  /**
+   * number of individuals calculated by one thread
+   */
+  uint32_t ivs_per_thread = (ev->parallel_end - ev->parallel_start) /
+                            ev->num_threads + 1;
+  #endif
+
   /* start parallel working */
   for (j = 0; j < ev->num_threads; j++) {
+
+    #ifdef LESS_SYNC
+    ev->thread_args[j].start = ev->parallel_start + j * ivs_per_thread;
+    ev->thread_args[j].end   = ev->thread_args[j].start + ivs_per_thread;
+
+    if (ev->thread_args[j].end > ev->parallel_end)
+      ev->thread_args[j].end = ev->parallel_end;
+    #endif
 
     tc_add_func(&ev->thread_clients[j], 
                 threadable_recombinate, 
@@ -488,6 +512,14 @@ static inline void ev_mutate(Evolution *ev) {
     ev->parallel_end   = ev->population_size * 2;
   }
 
+  #ifdef LESS_SYNC
+  /**
+   * number of individuals calculated by one thread
+   */
+  uint32_t ivs_per_thread = (ev->parallel_end - ev->parallel_start) /
+                            ev->num_threads + 1;
+  #endif
+
   /**
    * if deaths == survivors, making sure that all survivers 
    * are being copyed and mutated
@@ -497,6 +529,14 @@ static inline void ev_mutate(Evolution *ev) {
 
     /* start parallel working */
     for (j = 0; j < ev->num_threads; j++) {
+
+      #ifdef LESS_SYNC
+      ev->thread_args[j].start = ev->parallel_start + j * ivs_per_thread;
+      ev->thread_args[j].end   = ev->thread_args[j].start + ivs_per_thread;
+     
+      if (ev->thread_args[j].end > ev->parallel_end)
+        ev->thread_args[j].end = ev->parallel_end;
+      #endif
 
       tc_add_func(&ev->thread_clients[j], 
                   threadable_mutation_onely_1half, 
@@ -514,6 +554,14 @@ static inline void ev_mutate(Evolution *ev) {
 
     /* start parallel working */
     for (j = 0; j < ev->num_threads; j++) {
+
+      #ifdef LESS_SYNC
+      ev->thread_args[j].start = ev->parallel_start + j * ivs_per_thread;
+      ev->thread_args[j].end   = ev->thread_args[j].start + ivs_per_thread;
+     
+      if (ev->thread_args[j].end > ev->parallel_end)
+        ev->thread_args[j].end = ev->parallel_end;
+      #endif
 
       tc_add_func(&ev->thread_clients[j], 
                   threadable_mutation_onely_rand, 
@@ -556,7 +604,7 @@ static inline void ev_switch_ivs(Evolution *ev) {
  */
 Individual *evolute(Evolution *ev) {
 
-  int i;
+  int i, j;
 
   /**
    * Generation loop
@@ -570,12 +618,15 @@ Individual *evolute(Evolution *ev) {
          ev->continue_ev(ev))); 
        i++) {
     
+    #ifndef LESS_SYNC
+    (void) j;
     /**
-     * restes improovs and
+     * resets improovs and
      * updates generation counter
      */
     ev->info.improovs = 0;
     ev->info.generations_progressed = i;
+    #endif
   
     /**
      * recombinates or mutates individuals
@@ -598,6 +649,21 @@ Individual *evolute(Evolution *ev) {
      * Sort the Individuals by theur fittnes
      */
     EV_SELECTION(ev);
+
+    #ifdef LESS_SYNC
+    /**
+     * resets improovs and
+     * updates generation counter
+     */
+    ev->info.improovs = 0;
+    ev->info.generations_progressed = i;
+  
+    /**
+     * count iprooves of the finisehd thread
+     */
+    for (j = 0; j < ev->num_threads; j++)
+      ev->info.improovs += ev->thread_args[j].improovs;
+    #endif
 
     /**
      * print status informations if wanted
@@ -630,6 +696,71 @@ static void *threadable_recombinate(void *arg) {
   if (ev->survivors <= 1)
     ERR_MSG("less than 2 individuals in recombinate");
 
+  #ifdef LESS_SYNC
+  /* reset threadwide iprooves */
+  evt->improovs = 0;
+
+  /**
+   * loop untill all recombinations of this thread are done
+   */
+  for (j = evt->start; j < evt->end; j++) {
+
+    /**
+     * from two randomly choosen Individuals 
+     * of the untouched (best) part we calculate an new one 
+     * */
+    rand2 = rand1 = rand() % ev->parallel_start;
+    while (rand1 == rand2) rand2 = rand() % ev->parallel_start; 
+    
+    /* recombinate individuals */
+    ev->recombinate(ev->population[rand1], 
+                    ev->population[rand2], 
+                    ev->population[j], 
+                    ev->opts[evt->index]);
+    
+    /* mutate Individuals */
+    if (ev->use_muttation) {
+      if (ev->always_mutate)
+        ev->mutate(ev->population[j], ev->opts[evt->index]);
+      else {
+        if (rand() <= ev->i_mut_propability)
+          ev->mutate(ev->population[j], ev->opts[evt->index]);
+      }
+    }
+
+    /* calculate the fittnes for the new individuals */
+    ev->population[j]->fitness = ev->fitness(ev->population[j], 
+                                             ev->opts[evt->index]);
+
+    /**
+     * store if the new individual is better as the old one
+     */
+    if (ev->sort_max) {
+      if (ev->population[j]->fitness > ev->population[rand1]->fitness && 
+          ev->population[j]->fitness > ev->population[rand2]->fitness) {
+
+        evt->improovs++;
+      }
+
+    } else {
+      if (ev->population[j]->fitness < ev->population[rand1]->fitness && 
+          ev->population[j]->fitness < ev->population[rand2]->fitness) {
+
+        evt->improovs++;
+      }
+    }
+
+    /**
+     * print status informations if wanted
+     */
+    if (ev->verbose >= EV_VERBOSE_ONELINE) {
+      EV_IV_STATUS_OUTPUT(*ev, j);
+
+      if (ev->verbose >= EV_VERBOSE_ULTRA)
+        EV_THREAD_SAVE_NEW_LINE;
+    }
+  }
+  #else
   /**
    * loop untill all recombinations are done
    */
@@ -703,12 +834,13 @@ static void *threadable_recombinate(void *arg) {
       EV_IV_STATUS_OUTPUT(*ev, j);
 
       if (ev->verbose >= EV_VERBOSE_ULTRA)
-        printf("\n");
+        EV_THREAD_SAVE_NEW_LINE;
     }
   }
 
   /* after break we must unlock mutex */
   pthread_mutex_unlock(&ev_mutex);
+  #endif
 
   return arg;
 }
@@ -722,7 +854,60 @@ static void *threadable_mutation_onely_1half(void *arg) {
   EvThreadArgs *evt = arg;
   Evolution *ev     = evt->ev;
   int j;
+  
+  #ifdef LESS_SYNC
+  /* reset threadwide iprooves */
+  evt->improovs = 0;
 
+  /**
+   * loop untill all mutations of this thread are done
+   */
+  for (j = evt->start; j < evt->end; j++) {
+
+    /**
+     * clone the current individual (from the survivors)
+     * and override an individual in the deaths-part
+     */
+    ev->clone_iv(ev->population[j + ev->parallel_start]->iv, 
+                 ev->population[j]->iv, 
+                 ev->opts[evt->index]);
+
+    /* muttate the cloned individual */
+    ev->mutate(ev->population[j + ev->parallel_start], 
+               ev->opts[evt->index]);
+
+    /* calculate the fittnes for the new individual */
+    EV_CALC_FITNESS_AT(*ev, j + ev->parallel_start, ev->opts[evt->index]);
+    
+    /**
+     * store if the new individual is better as the old one
+     */
+    if (ev->sort_max) {
+      if (EV_FITNESS_AT(*ev, j + ev->parallel_start) > 
+          EV_FITNESS_AT(*ev, j)) {
+
+        evt->improovs++;
+      }
+
+    } else {
+      if (EV_FITNESS_AT(*ev, j + ev->parallel_start) <
+          EV_FITNESS_AT(*ev, j)) {
+
+        evt->improovs++;
+      }
+    }
+    
+    /**
+     * print status informations if wanted
+     */
+    if (ev->verbose >= EV_VERBOSE_ONELINE) {
+      EV_IV_STATUS_OUTPUT(*ev, j);
+
+      if (ev->verbose >= EV_VERBOSE_ULTRA)
+        EV_THREAD_SAVE_NEW_LINE;
+    }
+  }
+  #else
   /**
    * loop untill all mutations are done
    */
@@ -785,12 +970,13 @@ static void *threadable_mutation_onely_1half(void *arg) {
       EV_IV_STATUS_OUTPUT(*ev, j);
 
       if (ev->verbose >= EV_VERBOSE_ULTRA)
-        printf("\n");
+        EV_THREAD_SAVE_NEW_LINE;
     }
   }
 
   /* after break we must unlock */
   pthread_mutex_unlock(&ev_mutex);
+  #endif
 
   return arg;
 }
@@ -805,6 +991,58 @@ static void *threadable_mutation_onely_rand(void *arg) {
   Evolution *ev = evt->ev;
   int j, rand1;
 
+  #ifdef LESS_SYNC
+  /* reset threadwide iprooves */
+  evt->improovs = 0;
+
+  /**
+   * loop untill all mutations are done
+   */
+  for (j = evt->start; j < evt->end; j++) {
+
+    /**
+     * clone random individual (from the survivors)
+     * and override the current individual in the deaths-part
+     */
+    rand1 = rand() % ev->parallel_start;
+    ev->clone_iv(ev->population[j]->iv, 
+                 ev->population[rand1]->iv, 
+                 ev->opts[evt->index]);
+
+    /* muttate the cloned individual */
+    ev->mutate(ev->population[j], ev->opts[evt->index]);
+
+    /* calculate the fittnes for the new individual */
+    ev->population[j]->fitness = ev->fitness(ev->population[j], 
+                                             ev->opts[evt->index]);
+   
+    /**
+     * store if the new individual is better as the old one
+     */
+    if (ev->sort_max) {
+      if (ev->population[j]->fitness > ev->population[rand1]->fitness) {
+
+        evt->improovs++;
+      }
+
+    } else {
+      if (ev->population[j]->fitness < ev->population[rand1]->fitness) {
+
+        evt->improovs++;
+      }
+    }
+   
+    /**
+     * print status informations if wanted
+     */
+    if (ev->verbose >= EV_VERBOSE_ONELINE) {
+      EV_IV_STATUS_OUTPUT(*ev, j);
+
+      if (ev->verbose >= EV_VERBOSE_ULTRA)
+        EV_THREAD_SAVE_NEW_LINE;
+    }
+  }
+  #else
   /**
    * loop untill all mutations are done
    */
@@ -866,12 +1104,13 @@ static void *threadable_mutation_onely_rand(void *arg) {
       EV_IV_STATUS_OUTPUT(*ev, j);
 
       if (ev->verbose >= EV_VERBOSE_ULTRA)
-        printf("\n");
+        EV_THREAD_SAVE_NEW_LINE;
     }
   }
 
   /* after break we must unlock */
   pthread_mutex_unlock(&ev_mutex);
+  #endif
 
   return arg;
 }
