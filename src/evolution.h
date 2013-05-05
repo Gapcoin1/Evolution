@@ -303,12 +303,12 @@ char void_ptr_equal(void *a, void *b);
  */
 typedef struct {
   Evolution *const ev;    /* pointer to the current Evolution struct    */
-  int index;              /* index of the current working thread        */
-  int start;              /* start and end index for repleacing         */ 
-  int end;                /* individuals of the current working thread  */ //TODO better comment start end end ar te arre in which the new individuals wil be born into  parallel_end and parallel_start are the overall arre where individuals will be repleaced (update descriptions)  changed parallel start and end names into overall start overall end
-  int improovs;           /* improovs of the current thread             */
+  int  index;             /* index of the current working thread        */
+  int  start;             /* start and end index for repleacing         */ 
+  int  end;               /* individuals of the current working thread  */ 
+  int  improovs;          /* improovs of the current thread             */
   char waiting;           /* indecates if this thread is waiting        */
-  // TODO add the opt ptr for the current index (at init) so we can scip the opt[index]
+  void *const opt;        /* opts for the current thread                */
 } EvThreadArgs;
 
 /**
@@ -359,18 +359,11 @@ typedef struct {
  * | int min_quicksort                  | min array length to change from     |
  * |                                    | quick to insertion sort             |
  * |                                    |                                     |
- * | int parallel_index                 | used to syncornize the parallel     |
- * |                                    | access of the individuals during    |
- * |                                    | initializing, recombination usw.    |
- * |                                    | It will be decremented an used for  |
- * |                                    | the area where the individuals will |
- * |                                    | cosen for mutation usw.             |
- * |                                    |                                     |
- * | int parallel_start                 | indicates where to start repleacing |
+ * | int overall_start                  | indicates where to start repleacing |
  * |                                    | individuals during parallel         |
  * |                                    | calculation (array index)           |
  * |                                    |                                     |
- * | int parallel_end                   | indicates where to end repleacing   |
+ * | int overall_end                    | indicates where to end repleacing   |
  * |                                    | individuals during parallel         |
  * |                                    | calculation (array index)           |
  * |                                    |                                     |
@@ -428,9 +421,8 @@ struct Evolution {
   const int      min_quicksort;              
   void *const    *const opts;   
   const int      num_threads; 
-  int            parallel_index;
-  int            parallel_start;
-  int            parallel_end; 
+  int            overall_start;
+  int            overall_end; 
   const int      i_mut_propability;
   TClient *const thread_clients;
   EvThreadArgs   *const thread_args;
