@@ -303,9 +303,9 @@ char void_ptr_equal(void *a, void *b);
  */
 typedef struct {
   Evolution *const ev;    /* pointer to the current Evolution struct    */
-  const int index;        /* index of the current working thread        */
-  const int start;        /* start and end index for repleacing         */ 
-  const int end;          /* individuals of the current working thread  */ //TODO better comment start end end ar te arre in which the new individuals wil be born into  parallel_end and parallel_start are the overall arre where individuals will be repleaced (update descriptions)  changed parallel start and end names into overall start overall end
+  int index;              /* index of the current working thread        */
+  int start;              /* start and end index for repleacing         */ 
+  int end;                /* individuals of the current working thread  */ //TODO better comment start end end ar te arre in which the new individuals wil be born into  parallel_end and parallel_start are the overall arre where individuals will be repleaced (update descriptions)  changed parallel start and end names into overall start overall end
   int improovs;           /* improovs of the current thread             */
   char waiting;           /* indecates if this thread is waiting        */
   // TODO add the opt ptr for the current index (at init) so we can scip the opt[index]

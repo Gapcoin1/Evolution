@@ -249,16 +249,31 @@ static void ev_init_tc_and_ivs(Evolution *ev) {
    */
   int mul = ev->keep_last_generation ? 1 : 2;
 
-  /* start of parallel calculation */
-  ev->parallel_index = ev->population_size * mul;
+  /* start and end of calculation */
+  ev->parallel_start = 0;
+  ev->parallel_end   = ev->population_size * mul;
+
+  /**
+   * number of individuals calculated by one thread
+   */
+  uint32_t ivs_per_thread = (ev->parallel_end - ev->parallel_start) /
+                            ev->num_threads + 1;
 
   /* add work for the clients */
   for (i = 0; i < ev->num_threads; i++) {
 
+    /* init thread args */
     INIT_C_EVO(ev->thread_args[i].ev,    ev);
     INIT_C_INT(ev->thread_args[i].index, i);
     ev->thread_args[i].waiting  = 1;
-    ev->thread_args[i].improovs = 0
+    ev->thread_args[i].improovs = 0;
+
+    /* set working area of thread i */
+    ev->thread_args[i].start = ev->parallel_start + i * ivs_per_thread;
+    ev->thread_args[i].end   = ev->thread_args[i].start + ivs_per_thread;
+
+    if (ev->thread_args[i].end > ev->parallel_end)
+      ev->thread_args[i].end = ev->parallel_end;
 
     tc_add_func(&ev->thread_clients[i], 
                 threadable_init_iv, 
@@ -404,21 +419,10 @@ static void *threadable_init_iv(void *arg) {
   int i;
 
   /**
-   * Loop untill all individuals are initialized
+   * Loop untill all individuals of this thread are initialized
    */
-  while (1) {
+  for (i = evt->start; i < evt->end; i++) {
      
-    /**
-     * sync current working index
-     */
-    pthread_mutex_lock(&ev_mutex);
-    if (ev->parallel_index <= 0)
-      break;
- 
-    ev->parallel_index--;
-    i = ev->parallel_index;
-    pthread_mutex_unlock(&ev_mutex);
- 
     /**
      * create new individual
      */
@@ -437,9 +441,6 @@ static void *threadable_init_iv(void *arg) {
     }
   }
 
-  /* after break we must unlock */
-  pthread_mutex_unlock(&ev_mutex);
-
   return NULL;
 
 }
@@ -447,7 +448,7 @@ static void *threadable_init_iv(void *arg) {
 /**
  * Recombinates individual dunring an Generation change
  */
-static inline void ev_recombinate(Evolution *ev) {
+static inline void ev_init_recombinate(Evolution *ev) {
 
   int j;
 
@@ -458,11 +459,9 @@ static inline void ev_recombinate(Evolution *ev) {
    */
   if (ev->keep_last_generation) {
     ev->parallel_start = ev->survivors;
-    ev->parallel_index = ev->survivors;
     ev->parallel_end   = ev->population_size;
   } else {
     ev->parallel_start = ev->population_size;
-    ev->parallel_index = ev->population_size;
     ev->parallel_end   = ev->population_size * 2;
   }
 
