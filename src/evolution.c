@@ -156,7 +156,7 @@ static inline char ev_equal(Individual *a, Individual *b) {
 
 /**
  * Prints status information during 
- * threadable recombination and mutation
+ * threadable recombination and mutation TODO make seperate output vor recombination mut_1/2
  */
 #define EV_IV_STATUS_OUTPUT(EV, INDEX)                                        \
   do {                                                                        \

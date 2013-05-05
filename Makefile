@@ -34,6 +34,17 @@ PARALLEL_PTHREAD_TEST_BIN_O2	= $(BIN)/test-parallel_pthread-O2
 PARALLEL_PTHREAD_TEST_BIN_O3	= $(BIN)/test-parallel_pthread-O3
 
 #
+# +-----------+
+# | Last Test |
+# +-----------+
+#
+LAST_TEST_SRC			= $(TEST)/last_test.c
+LAST_TEST_OBJ			= $(BIN)/last_test.o
+LAST_TEST_BIN			= $(BIN)/last_test
+LAST_TEST_BIN_O2	= $(BIN)/last_test-O2
+LAST_TEST_BIN_O3	= $(BIN)/last_test-O3
+
+#
 # +---------------+
 # | Parallel Test |
 # +---------------+
@@ -110,6 +121,27 @@ evolution-O3: utils
 evolution-debug: utils
 	@echo "Make Evolution with debugging options"
 	$(CC) $(CFLAGS) $(DBFLAGS) $(EVOLUTION_SRC) -o $(EVOLUTION_OBJ)
+
+last-test: CFLAGS += -D NO_OUTPUT
+last-test: evolution
+	@echo "Make last-test"
+	$(CC) $(CFLAGS) $(LAST_TEST_SRC) -o $(LAST_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(LAST_TEST_OBJ)											\
+				-o $(LAST_TEST_BIN)
+
+last-test-O2: CFLAGS += -D NO_OUTPUT
+last-test-O2: clean_obj evolution-O2
+	@echo "Make last-test O2"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(LAST_TEST_SRC) -o $(LAST_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(LAST_TEST_OBJ) 											\
+				-o $(LAST_TEST_BIN_O2)
+
+last-test-O3: CFLAGS += -D NO_OUTPUT
+last-test-O3: clean_obj evolution-O3
+	@echo "Make last-test O3"
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(LAST_TEST_SRC) -o $(LAST_TEST_OBJ)
+	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(LAST_TEST_OBJ) 											\
+				-o $(LAST_TEST_BIN_O3)
 
 parallel-test: CFLAGS += -D NO_OUTPUT
 parallel-test: evolution
