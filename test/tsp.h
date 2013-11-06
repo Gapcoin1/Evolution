@@ -49,6 +49,7 @@ typedef struct {
  * for evolute an TSP
  */
 typedef struct {
+  uint16_t index;           /* index of the thread */
   TSP tsp;                  /* the tsp */
   UI32Ary citys;            /* indexes of all citys */
   UI32Ary tmp;              /* temp array for calculation */

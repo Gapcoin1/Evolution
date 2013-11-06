@@ -11,42 +11,43 @@
 #endif
 
 #include "../src/evolution.h"
+#include "../src/C-Utils/Rand/src/rand.h"
 
 typedef struct {
   int a, b, c, d, e, f;
 } Vektor;
 
 void *init_v(void *opts) {
-  (void) opts;
+  uint64_t *n = (uint64_t *) opts; (void) n;
   Vektor *v = (Vektor *) malloc(sizeof(Vektor));
-  v->a = (rand() % 100) - 50;
-  v->b = (rand() % 100) - 50;
-  v->c = (rand() % 100) - 50;
-  v->d = (rand() % 100) - 50;
-  v->e = (rand() % 100) - 50;
-  v->f = (rand() % 100) - 50;
+
+  v->a = (rand32(*n) % 100) - 50;
+  v->b = (rand32(*n) % 100) - 50;
+  v->c = (rand32(*n) % 100) - 50;
+  v->d = (rand32(*n) % 100) - 50;
+  v->e = (rand32(*n) % 100) - 50;
+  v->f = (rand32(*n) % 100) - 50;
   
   int i;
-  for (i = 0; i < 100000; i++) {
-    v->a = v->b + v->e;
-    v->f = v->a + v->a;
-    v->b = v->e + v->b;
-    v->c = v->d + v->d;
-    v->d = v->a + v->f;
-    v->e = v->b + v->a;
-    v->a = v->e + v->b;
-    v->d = v->f + v->c;
-    v->e = v->c + v->e;
-    v->f = v->a + v->d;
-    v->a = v->e + v->f;
-    v->b = v->f + v->e;
-    v->c = v->d + v->c;
-    v->f = v->d + v->a;
-    v->d = v->a + v->d;
-    v->e = v->b + v->e;
-    v->c = v->e + v->f;
-  }
-
+  for (i = 0; i < 1000; i++) {
+    v->a = rand32(*n) * v->b + v->e;
+    v->f = rand32(*n) * v->a + v->a;
+    v->b = rand32(*n) * v->e + v->b;
+    v->c = rand32(*n) * v->d + v->d;
+    v->d = rand32(*n) * v->a + v->f;
+    v->e = rand32(*n) * v->b + v->a;
+    v->a = rand32(*n) * v->e + v->b;
+    v->d = rand32(*n) * v->f + v->c;
+    v->e = rand32(*n) * v->c + v->e;
+    v->f = rand32(*n) * v->a + v->d;
+    v->a = rand32(*n) * v->e + v->f;
+    v->b = rand32(*n) * v->f + v->e;
+    v->c = rand32(*n) * v->d + v->c;
+    v->f = rand32(*n) * v->d + v->a;
+    v->d = rand32(*n) * v->a + v->d;
+    v->e = rand32(*n) * v->b + v->e;
+    v->c = rand32(*n) * v->e + v->f;
+  }        
   return v;
 }
 
@@ -86,15 +87,15 @@ void recombinate_v(Individual *src1,
 }
 
 void mutate_v(Individual *src, void *opts) {
-  (void) opts;
+  uint64_t *n = (uint64_t *) opts; (void) n;
   Vektor *v = (Vektor *) src->iv;
 
-    v->a += (rand() % 3) - 1;
-    v->b += (rand() % 3) - 1;
-    v->c += (rand() % 3) - 1;
-    v->d += (rand() % 3) - 1;
-    v->e += (rand() % 3) - 1;
-    v->f += (rand() % 3) - 1;
+    v->a += (rand32(*n) % 3) - 1;
+    v->b += (rand32(*n) % 3) - 1;
+    v->c += (rand32(*n) % 3) - 1;
+    v->d += (rand32(*n) % 3) - 1;
+    v->e += (rand32(*n) % 3) - 1;
+    v->f += (rand32(*n) % 3) - 1;
 }
 
 int64_t fittnes_v(Individual *src, void *opts) {
@@ -125,6 +126,15 @@ int main(int argc, char *argv[]) {
 
   Individual best;
   void **opts = malloc(sizeof(void *) * TEST_NUM_IVS);
+
+  uint64_t i;
+  for (i = 0; i < TEST_NUM_IVS; i++) {
+    opts[i] = malloc(sizeof(uint64_t));
+    *(uint64_t *) opts[i] = i;
+  }
+
+  init_rand32(time(NULL));
+  
 
   EvInitArgs args;
   args.init_iv              = init_v;
@@ -157,7 +167,6 @@ int main(int argc, char *argv[]) {
          v->f, 
          best->fitness);
 
-  int i;
   for (i = 0; i < TEST_NUM_IVS; i++) {
     best = ev->population[i];
     v = (Vektor *) best->iv;

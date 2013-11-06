@@ -1,276 +1,167 @@
 VERSION = 1.0.0
-SRC   							= ./src
-SORT_SRC 						= $(SRC)/C-Utils/Sort
-THREAD_CLIENTS_SRC 	= $(SRC)/C-Utils/Thread-Clients
 BIN   							= ./bin
-SORT_BIN 						= $(SORT_SRC)/bin
-THREAD_CLIENTS_BIN 	= $(THREAD_CLIENTS_SRC)/bin
-TEST    						= ./test
 CC									= gcc
-CFLAGS							= -Wall -Wextra -Werror -c -g -D DEBUG
-LDFLAGS							= -lm -lpthread $(SORT_BIN)/sort.o 												\
-																		$(THREAD_CLIENTS_BIN)/thread-clients.o 		\
-																		$(THREAD_CLIENTS_BIN)/thread-client.o
+CFLAGS							= -Wall -Wextra -Werror -c -Winline 
+LDFLAGS							= -lm -lpthread
 OTFLAGS 						= -march=native
-DBFLAGS							= -g
+DBFLAGS							= -g -D DEBUG
+LIB									= src/C-Utils
 
-#
-# +--------------------------+
-# | src Files alsways needed |
-# +--------------------------+
-#
-EVOLUTION_SRC = $(SRC)/evolution.c
-EVOLUTION_OBJ = $(BIN)/evolution.o
+LIB_SRC = $(shell find $(LIB) -type f -name '*.c'|grep ".*/test/.*" -v)
+LIB_OBJ = $(LIB_SRC:%.c=%.o)
 
-#
-# +-----------------------+
-# | Parallel Test PThread |
-# +-----------------------+
-#
-PARALLEL_PTHREAD_TEST_SRC			= $(TEST)/test-parallel.c
-PARALLEL_PTHREAD_TEST_OBJ			= $(BIN)/test-parallel_pthread.o
-PARALLEL_PTHREAD_TEST_BIN			= $(BIN)/test-parallel_pthread
-PARALLEL_PTHREAD_TEST_BIN_O2	= $(BIN)/test-parallel_pthread-O2
-PARALLEL_PTHREAD_TEST_BIN_O3	= $(BIN)/test-parallel_pthread-O3
+prepare:
+	@mkdir -p $(BIN)
 
-#
-# +-----------+
-# | Last Test |
-# +-----------+
-#
-LAST_TEST_SRC			= $(TEST)/last_test.c
-LAST_TEST_OBJ			= $(BIN)/last_test.o
-LAST_TEST_BIN			= $(BIN)/last_test
-LAST_TEST_BIN_O2	= $(BIN)/last_test-O2
-LAST_TEST_BIN_O3	= $(BIN)/last_test-O3
+%.o: %.c
+	$(CC) $(CFLAGS) $^ -o $@
 
-#
-# +---------------+
-# | Parallel Test |
-# +---------------+
-#
-PARALLEL_TEST_SRC			= $(TEST)/test-parallel.c
-PARALLEL_TEST_OBJ			= $(BIN)/test-parallel.o
-PARALLEL_TEST_BIN			= $(BIN)/test-parallel
-PARALLEL_TEST_BIN_O2	= $(BIN)/test-parallel-O2
-PARALLEL_TEST_BIN_O3	= $(BIN)/test-parallel-O3
+compile: $(LIB_OBJ)
 
-#
-# +------------------+
-# | TSP Test PThread |
-# +------------------+
-#
-TSP_PTHREAD_TEST_SRC			= $(TEST)/tsp.c
-TSP_PTHREAD_TEST_OBJ			= $(BIN)/tsp_pthread.o
-TSP_PTHREAD_TEST_BIN			= $(BIN)/tsp_pthread
-TSP_PTHREAD_TEST_BIN_O2	  = $(BIN)/tsp_pthread-O2
-TSP_PTHREAD_TEST_BIN_O3	  = $(BIN)/tsp_pthread-O3
+link: prepare compile
+LDFLAGS += $(LIB_OBJ)
 
-#
-# +----------+
-# | TSP Test |
-# +----------+
-#
-TSP_TEST_SRC			= $(TEST)/tsp.c
-TSP_TEST_OBJ			= $(BIN)/tsp.o
-TSP_TEST_BIN			= $(BIN)/tsp
-TSP_TEST_BIN_O2	  = $(BIN)/tsp-O2
-TSP_TEST_BIN_O3	  = $(BIN)/tsp-O3
+debug: CC += $(DBFLAGS)
+debug: clean link evolution evolution-O2 evolution-O3 all
 
-#
-# +---------------------+
-# | Onely Mutation Test |
-# +---------------------+
-#
-O_MUTATE_TEST_SRC			= $(TEST)/test-only-mutate.c
-O_MUTATE_TEST_OBJ			= $(BIN)/test-only-mutate.o
-O_MUTATE_TEST_BIN			= $(BIN)/test-only-mutate
-O_MUTATE_TEST_BIN_O2	= $(BIN)/test-only-mutate-O2
-O_MUTATE_TEST_BIN_O3	= $(BIN)/test-only-mutate-O3
 
-#
-# +------------------------+
-# | Use Recombination Test |
-# +------------------------+
-#
-U_REC_TEST_SRC			= $(TEST)/test-use-recombination.c
-U_REC_TEST_OBJ			= $(BIN)/test-use-recombination.o
-U_REC_TEST_BIN			= $(BIN)/test-use-recombination
-U_REC_TEST_BIN_O2	= $(BIN)/test-use-recombination-O2
-U_REC_TEST_BIN_O3	= $(BIN)/test-use-recombination-O3
-
-utils:
-	@echo "Make depending stuff"
-	mkdir -p ./bin
-	make -C $(SORT_SRC)
-	make -C $(THREAD_CLIENTS_SRC) thread-clients
-	make -C $(THREAD_CLIENTS_SRC) thread-client
-
-evolution: utils
+evolution: link
 	@echo "Make Evolution"
-	$(CC) $(CFLAGS) $(EVOLUTION_SRC) -o $(EVOLUTION_OBJ)
+	$(CC) $(CFLAGS) src/evolution.c -o src/evolution.o
 
-evolution-O2: utils
+evolution-O2: link
 	@echo "Make Evolution"
-	$(CC) $(CFLAGS) $(OTFLAGS) -O2 $(EVOLUTION_SRC) -o $(EVOLUTION_OBJ)
+	$(CC) $(CFLAGS) $(OTFLAGS) -O2 src/evolution.c -o src/evolution-O2.o
 
-evolution-O3: utils
+evolution-O3: link
 	@echo "Make Evolution"
-	$(CC) $(CFLAGS) $(OTFLAGS) -O3 $(EVOLUTION_SRC) -o $(EVOLUTION_OBJ)
+	$(CC) $(CFLAGS) $(OTFLAGS) -O3 src/evolution.c -o src/evolution-O3.o
 
-evolution-debug: utils
+evolution-debug: link
 	@echo "Make Evolution with debugging options"
-	$(CC) $(CFLAGS) $(DBFLAGS) $(EVOLUTION_SRC) -o $(EVOLUTION_OBJ)
+	$(CC) $(CFLAGS) $(DBFLAGS) src/evolution.c -o src/evolution-debug.o
 
 last-test: CFLAGS += -D NO_OUTPUT
 last-test: evolution
 	@echo "Make last-test"
-	$(CC) $(CFLAGS) $(LAST_TEST_SRC) -o $(LAST_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(LAST_TEST_OBJ)											\
-				-o $(LAST_TEST_BIN)
+	$(CC) $(CFLAGS) test/last_test.c -o test/last_test.o
+	$(CC) $(LDFLAGS) src/evolution.o test/last_test.o											\
+				-o $(BIN)/last_test
 
 last-test-O2: CFLAGS += -D NO_OUTPUT
-last-test-O2: clean_obj evolution-O2
+last-test-O2: evolution-O2
 	@echo "Make last-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(LAST_TEST_SRC) -o $(LAST_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(LAST_TEST_OBJ) 											\
-				-o $(LAST_TEST_BIN_O2)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/last_test.c -o test/last_test.o
+	$(CC) $(LDFLAGS) src/evolution-O2.o test/last_test.o 											\
+				-o $(BIN)/last_test-O2
 
 last-test-O3: CFLAGS += -D NO_OUTPUT
-last-test-O3: clean_obj evolution-O3
+last-test-O3: evolution-O3
 	@echo "Make last-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(LAST_TEST_SRC) -o $(LAST_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(LAST_TEST_OBJ) 											\
-				-o $(LAST_TEST_BIN_O3)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/last_test.c -o test/last_test.o
+	$(CC) $(LDFLAGS) src/evolution-O3.o test/last_test.o 											\
+				-o $(BIN)/last_test-O3
 
 parallel-test: CFLAGS += -D NO_OUTPUT
 parallel-test: evolution
 	@echo "Make parallel-test"
-	$(CC) $(CFLAGS) $(PARALLEL_TEST_SRC) -o $(PARALLEL_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ)											\
-				-o $(PARALLEL_TEST_BIN)
-
+	$(CC) $(CFLAGS) test/test-parallel.c -o test/test-parallel.o
+	$(CC) $(LDFLAGS) src/evolution.o test/test-parallel.o											\
+				-o $(BIN)/test-parallel
+				
 parallel-test-O2: CFLAGS += -D NO_OUTPUT
-parallel-test-O2: clean_obj evolution-O2
+parallel-test-O2: evolution-O2
 	@echo "Make parallel-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_TEST_SRC) -o $(PARALLEL_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ) 											\
-				-o $(PARALLEL_TEST_BIN_O2)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/test-parallel.c -o test/test-parallel.o
+	$(CC) $(LDFLAGS) src/evolution-O2.o test/test-parallel.o 											\
+				-o $(BIN)/test-parallel-O2
 
 parallel-test-O3: CFLAGS += -D NO_OUTPUT
-parallel-test-O3: clean_obj evolution-O3
+parallel-test-O3: evolution-O3
 	@echo "Make parallel-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_TEST_SRC) -o $(PARALLEL_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_TEST_OBJ) 											\
-				-o $(PARALLEL_TEST_BIN_O3)
-
-parallel_pthread-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
-parallel_pthread-test: evolution
-	@echo "Make parallel_pthread-test"
-	$(CC) $(CFLAGS) $(PARALLEL_PTHREAD_TEST_SRC) -o $(PARALLEL_PTHREAD_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_TEST_OBJ)											\
-				-o $(PARALLEL_PTHREAD_TEST_BIN)
-
-parallel_pthread-test-O2: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
-parallel_pthread-test-O2: clean_obj evolution-O2
-	@echo "Make parallel_pthread-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_PTHREAD_TEST_SRC) -o $(PARALLEL_PTHREAD_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_TEST_OBJ) 											\
-				-o $(PARALLEL_PTHREAD_TEST_BIN_O2)
-
-parallel_pthread-test-O3: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
-parallel_pthread-test-O3: clean_obj evolution-O3
-	@echo "Make parallel_pthread-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(PARALLEL_PTHREAD_TEST_SRC) -o $(PARALLEL_PTHREAD_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(PARALLEL_PTHREAD_TEST_OBJ) 											\
-				-o $(PARALLEL_PTHREAD_TEST_BIN_O3)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/test-parallel.c -o test/test-parallel.o
+	$(CC) $(LDFLAGS) src/evolution-O3.o test/test-parallel.o 											\
+				-o $(BIN)/test-parallel-O3
 
 tsp-test: CFLAGS += -D NO_OUTPUT
 tsp-test: evolution
 	@echo "Make tsp-test"
-	$(CC) $(CFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ)											\
-				-o $(TSP_TEST_BIN)
+	$(CC) $(CFLAGS) test/tsp.c -o test/tsp.o
+	$(CC) $(LDFLAGS) src/evolution.o test/tsp.o											\
+				-o $(BIN)/tsp
 
 tsp-test-O2: CFLAGS += -D NO_OUTPUT
-tsp-test-O2: clean_obj evolution-O2
+tsp-test-O2: evolution-O2
 	@echo "Make tsp-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
-				-o $(TSP_TEST_BIN_O2)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) test/tsp.c -o test/tsp.o
+	$(CC) $(LDFLAGS) src/evolution-O2.o test/tsp.o 											\
+				-o $(BIN)/tsp-O2
 
 tsp-test-O3: CFLAGS += -D NO_OUTPUT
-tsp-test-O3: clean_obj evolution-O3
+tsp-test-O3: evolution-O3
 	@echo "Make tsp-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_TEST_SRC) -o $(TSP_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_TEST_OBJ) 											\
-				-o $(TSP_TEST_BIN_O3)
-
-tsp_pthread-test: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
-tsp_pthread-test: evolution
-	@echo "Make tsp_pthread-test"
-	$(CC) $(CFLAGS) $(TSP_PTHREAD_TEST_SRC) -o $(TSP_PTHREAD_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_PTHREAD_TEST_OBJ)											\
-				-o $(TSP_PTHREAD_TEST_BIN)
-
-tsp_pthread-test-O2: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
-tsp_pthread-test-O2: clean_obj evolution-O2
-	@echo "Make tsp_pthread-test O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_PTHREAD_TEST_SRC) -o $(TSP_PTHREAD_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_PTHREAD_TEST_OBJ) 											\
-				-o $(TSP_PTHREAD_TEST_BIN_O2)
-
-tsp_pthread-test-O3: CFLAGS += -D NO_THREAD_CLIENTS -D NO_OUTPUT
-tsp_pthread-test-O3: clean_obj evolution-O3
-	@echo "Make tsp_pthread-test O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) $(TSP_PTHREAD_TEST_SRC) -o $(TSP_PTHREAD_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(TSP_PTHREAD_TEST_OBJ) 											\
-				-o $(TSP_PTHREAD_TEST_BIN_O3)
+	$(CC) $(CFLAGS) -D NO_OUTPUT $(OTFLAGS) test/tsp.c -o test/tsp.o
+	$(CC) $(LDFLAGS) src/evolution-O3.o test/tsp.o 											\
+				-o $(BIN)/tsp-O3
 				
 test-only-mutate: evolution
 	@echo "Make test-only-mutate"
-	$(CC) $(CFLAGS) $(O_MUTATE_TEST_SRC) -o $(O_MUTATE_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(SORT_OBJ) $(O_MUTATE_TEST_OBJ) 					\
-				-o $(O_MUTATE_TEST_BIN)
+	$(CC) $(CFLAGS) test/test-only-mutate.c -o test/test-only-mutate.o
+	$(CC) $(LDFLAGS) src/evolution.o $(SORT_OBJ) test/test-only-mutate.o 			\
+				-o $(BIN)/test-only-mutate
 
-test-only-mutate-O2: clean_obj evolution-O2
+test-only-mutate-O2: evolution-O2
 	@echo "Make test-only-mutate O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(O_MUTATE_TEST_SRC) -o $(O_MUTATE_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(O_MUTATE_TEST_OBJ) 											\
-				-o $(O_MUTATE_TEST_BIN_O2)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/test-only-mutate.c 											\
+									-o test/test-only-mutate.o
+	$(CC) $(LDFLAGS) src/evolution-O2.o test/test-only-mutate.o 									\
+				-o $(BIN)/test-only-mutate-O2
 
-test-only-mutate-O3: clean_obj evolution-O3
+test-only-mutate-O3: evolution-O3
 		@echo "Make test-only-mutate O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(O_MUTATE_TEST_SRC) -o $(O_MUTATE_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(O_MUTATE_TEST_OBJ) 											\
-				-o $(O_MUTATE_TEST_BIN_O3)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/test-only-mutate.c 										\
+									-o test/test-only-mutate.o
+	$(CC) $(LDFLAGS) src/evolution-O3.o test/test-only-mutate.o 								\
+				-o $(BIN)/test-only-mutate-O3
 
 test-use-recombination: evolution
 	@echo "Make test-use-recombination"
-	$(CC) $(CFLAGS) $(U_REC_TEST_SRC) -o $(U_REC_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(U_REC_TEST_OBJ) -o $(U_REC_TEST_BIN)
+	$(CC) $(CFLAGS) test/test-use-recombination.c 											\
+									-o test/test-use-recombination.o
+	$(CC) $(LDFLAGS) src/evolution.o test/test-use-recombination.o 			\
+									-o $(BIN)/test-use-recombination
 
-test-use-recombination-O2: clean_obj evolution-O2
+test-use-recombination-O2: evolution-O2
 	@echo "Make test-use-recombination O2"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(U_REC_TEST_SRC) -o $(U_REC_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(U_REC_TEST_OBJ) -o $(U_REC_TEST_BIN_O2)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/test-use-recombination.c 								\
+									-o test/test-use-recombination.o
+	$(CC) $(LDFLAGS) src/evolution-O2.o test/test-use-recombination.o 						\
+									-o $(BIN)/test-use-recombination-O2
 
-test-use-recombination-O3: clean_obj evolution-O3
+test-use-recombination-O3: evolution-O3
 	@echo "Make test-use-recombination O3"
-	$(CC) $(CFLAGS) -D NO_OUTPUT $(U_REC_TEST_SRC) -o $(U_REC_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(U_REC_TEST_OBJ) -o $(U_REC_TEST_BIN_O3)
+	$(CC) $(CFLAGS) -D NO_OUTPUT test/test-use-recombination.c 						\
+									-o test/test-use-recombination.o
+	$(CC) $(LDFLAGS) src/evolution-O3.o test/test-use-recombination.o 				\
+									-o $(BIN)/test-use-recombination-O3
 
 
 parallel-test-debug: evolution-debug
 	@echo "Make parallel-test with debugging options"
-	$(CC) $(CFLAGS) $(DBFLAGS) $(O_MUTATE_TEST_SRC) -o $(O_MUTATE_TEST_OBJ)
-	$(CC) $(LDFLAGS) $(EVOLUTION_OBJ) $(O_MUTATE_TEST_OBJ) 											\
-				-o $(O_MUTATE_TEST_BIN)
+	$(CC) $(CFLAGS) $(DBFLAGS) test/test-only-mutate.c 						\
+									-o test/test-only-mutate.o
+	$(CC) $(LDFLAGS) src/evolution-debug.o test/test-only-mutate.o 			\
+				-o $(BIN)/test-only-mutate
 
 clean_obj:
 	@echo "make clean obj"
-	rm $(BIN)/*.o
+	@find .|grep "\.o$$"| xargs -I{} rm -rf "{}"
 
-clean:
+clean: clean_obj
 	@echo "make clean"
-	rm $(BIN)/*
+	rm -rf $(BIN)
+
+all: parallel-test-debug test-use-recombination-O3 test-use-recombination-O2 \
+		 test-use-recombination test-only-mutate-O3 test-only-mutate-O2 				 \
+		 test-only-mutate tsp-test-O3 tsp-test-O2 tsp-test parallel-test-O3 		 \
+		 parallel-test-O2 parallel-test last-test-O3 last-test-O2 last-test

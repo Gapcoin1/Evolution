@@ -1,7 +1,9 @@
 /**
  * Header of an Evolution Algorithm
  *
- * to solf an optimation Problem
+ * to solf an optimation Problem  
+ * TODO use two semaphones to sync threads instead of sched_yield (also in tc_clients)
+ *      create a serial version since it seam to be slower in parealell mode
  */
 #ifndef EVOLUTION_HEADER
 #define EVOLUTION_HEADER
@@ -288,16 +290,6 @@ typedef struct {
   uint16_t flags;
 } EvInitArgs;
 
-
-
-/**
- * Functions for Sorting the Population by Fitness
- * void pointer version 
- */
-char void_ptr_bigger(void *a, void *b);
-char void_ptr_smaler(void *a, void *b);
-char void_ptr_equal(void *a, void *b);
-
 /**
  * Struct holding information for the thread clients
  */
@@ -307,7 +299,6 @@ typedef struct {
   int  start;             /* start and end index for repleacing         */ 
   int  end;               /* individuals of the current working thread  */ 
   int  improovs;          /* improovs of the current thread             */
-  char waiting;           /* indecates if this thread is waiting        */
   void *const opt;        /* opts for the current thread                */
 } EvThreadArgs;
 
@@ -379,12 +370,12 @@ typedef struct {
  * |                                    |                                     |
  * | EvThreadArgs thread_args           | different argments for each thread  |
  * |                                    | containing an thread specific index |
+ * |                                    | creating each arg in an seperate    |
+ * |                                    | heap space to improof parallelism   |
+ * |                                    | (cache optimation)                  |
  * |                                    |                                     |
  * | EvolutionInfo info                 | additional information during an    |
  * |                                    | evolution                           |
- * |                                    |                                     |
- * | char threads_running               | indecates wether threads should     |
- * |                                    | keep working or not                 |
  * +------------------------------------+-------------------------------------+
  * 
  * Note: many values are const like opts (an const pointer to an array of
@@ -423,10 +414,9 @@ struct Evolution {
   const int      num_threads; 
   int            overall_start;
   int            overall_end; 
-  const int      i_mut_propability;
+  const uint32_t i_mut_propability;
   TClient *const thread_clients;
-  EvThreadArgs   *const thread_args;
-  char           threads_running;
+  EvThreadArgs   *const *const thread_args;
   EvolutionInfo  info;
 };
 

@@ -6,6 +6,7 @@
 #define __TSP__
 
 #include "tsp.h"
+#include "../src/C-Utils/Rand/src/rand.h"
 
 /* functions */
 TSP *new_tsp(uint32_t length);
@@ -50,10 +51,14 @@ int main(int argc, char *argv[]) {
   TSP *tsp            = new_tsp(n_citys);
   TSPEvolution **opts = malloc(sizeof(TSPEvolution *) * n_threads);
 
+  init_rand32(n_threads);
+  init_rand32_serial(time(NULL));
+
 
   int i;
   for (i = 0; i < n_threads; i++) {
     opts[i] = malloc(sizeof(TSPEvolution));
+    opts[i]->index = i;
     init_tsp_ev(opts[i], tsp);
   }
 
@@ -145,7 +150,7 @@ TSP *new_tsp(uint32_t length) {
 
   tsp->length    = length;
   tsp->distances = malloc(sizeof(uint32_t *) * length);
-  tsp->start     = rand() % length;
+  tsp->start     = rand32() % length;
 
   uint32_t x, y;
   for (x = 0; x < length; x++) {
@@ -156,7 +161,7 @@ TSP *new_tsp(uint32_t length) {
   /* fill tsp with random distances */
   for (x = 0; x < length; x++) {
     for (y = x + 1; y < length; y++) {
-      tsp->distances[x][y] = tsp->distances[y][x] = 1 + (rand() % length);  
+      tsp->distances[x][y] = tsp->distances[y][x] = 1 + (rand32() % length);  
     }
   }
 
@@ -348,8 +353,8 @@ void mutate_tsp_route_switch(Individual *iv, void *opts) {
   TSPEvolution *tsp_ev = opts;
   TSPRoute     *route = iv->iv;
  
-  uint32_t start = rand() % (route->length - 1);
-  uint32_t end   = 1 + (rand() % (route->length - 1));
+  uint32_t start = rand32(tsp_ev->index) % (route->length - 1);
+  uint32_t end   = 1 + (rand32(tsp_ev->index) % (route->length - 1));
   uint32_t tmp;
 
   /* switch citys */
@@ -395,14 +400,14 @@ void mutate_tsp_route_reinit(Individual *iv, void *opts) {
    * wenn need min three roads because start(city_a) of road 0
    * and end(city_b) of last road are fixed
    */
-  int32_t length = (rand() % (1 + route->length - 3)); 
-  length -= (int32_t) (((double) (rand() % (1 + route->length - 3))) *
+  int32_t length = (rand32(tsp_ev->index) % (1 + route->length - 3)); 
+  length -= (int32_t) (((double) (rand32(tsp_ev->index) % (1 + route->length - 3))) *
                         tsp_ev->mut_size_reduce);
   if (length <= 3)
     length = 3;
 
   /* chose random start position */
-  uint32_t start = rand() % (1 + (route->length - length));
+  uint32_t start = rand32(tsp_ev->index) % (1 + (route->length - length));
   uint32_t end   = start + length - 1;
 
   /**
