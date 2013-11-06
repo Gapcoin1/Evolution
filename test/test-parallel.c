@@ -5,7 +5,7 @@
  * using an Vektor of ints as an Idividum
  */
 #define MAX_U_INT32 4294967295L
-#define TEST_NUM_IVS 100
+#define TEST_NUM_IVS 128
 #ifndef NULL
 #define NULL 0
 #endif
@@ -25,6 +25,28 @@ void *init_v(void *opts) {
   v->d = (rand() % 100) - 50;
   v->e = (rand() % 100) - 50;
   v->f = (rand() % 100) - 50;
+  
+  int i;
+  for (i = 0; i < 100000; i++) {
+    v->a = v->b + v->e;
+    v->f = v->a + v->a;
+    v->b = v->e + v->b;
+    v->c = v->d + v->d;
+    v->d = v->a + v->f;
+    v->e = v->b + v->a;
+    v->a = v->e + v->b;
+    v->d = v->f + v->c;
+    v->e = v->c + v->e;
+    v->f = v->a + v->d;
+    v->a = v->e + v->f;
+    v->b = v->f + v->e;
+    v->c = v->d + v->c;
+    v->f = v->d + v->a;
+    v->d = v->a + v->d;
+    v->e = v->b + v->e;
+    v->c = v->e + v->f;
+  }
+
   return v;
 }
 
@@ -101,8 +123,8 @@ int main(int argc, char *argv[]) {
     default : verbose = EV_VEB0; 
   }
 
-  Individual *best;
-  int opts[10];
+  Individual best;
+  void **opts = malloc(sizeof(void *) * TEST_NUM_IVS);
 
   EvInitArgs args;
   args.init_iv              = init_v;
@@ -116,12 +138,11 @@ int main(int argc, char *argv[]) {
   args.generation_limit     = atoi(argv[1]);
   args.mutation_propability = 1.0;
   args.death_percentage     = 0.5;
-  args.opts                 = (void **) &opts;
+  args.opts                 = opts;
   args.num_threads          = atoi(argv[2]);
   args.flags                = EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|verbose;
 
-  Evolution *ev = new_evolution(&args);
-  best = evolute(ev);
+  best = best_evolution(&args);;
 
   #ifndef NO_OUTPUT
   Vektor *v = (Vektor *) best->iv;
@@ -153,6 +174,8 @@ int main(int argc, char *argv[]) {
   #else
   (void) best;
   #endif
+
+  free_v(best.iv, (void *) opts);
 
   return 0;
 }
