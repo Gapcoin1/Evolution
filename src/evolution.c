@@ -1352,4 +1352,48 @@ static void seriel_mutation_onely_rand(Evolution *ev) {
   }
 }
 
+/**
+ * prints informations about an given evolution
+ */
+void ev_inspect(Evolution *ev) {
+  
+  printf("Evolution:\n\t"
+         "population_size:       %d\n\t"
+         "generation_limit:      %d\n\t"
+         "mutation_propability:  %f\n\t"
+         "death_percentage:      %f\n\t"
+         "use_recombination:     %d\n\t"
+         "use_muttation:         %d\n\t"
+         "always_mutate:         %d\n\t"
+         "keep_last_generation:  %d\n\t"
+         "use_abort_requirement: %d\n\t"
+         "deaths:                %d\n\t"
+         "survivors:             %d\n\t"
+         "sort_max:              %d\n\t"
+         "verbose:               %d\n\t"
+         "min_quicksort:         %d\n\t"
+         "num_threads:           %d\n\t"
+         "overall_start:         %d\n\t"
+         "overall_end:           %d\n\t"
+         "i_mut_propability:     %d\n\t",
+         ev->population_size,
+         ev->generation_limit,
+         ev->mutation_propability,
+         ev->death_percentage,
+         ev->use_recombination,
+         ev->use_muttation,
+         ev->always_mutate,
+         ev->keep_last_generation,
+         ev->use_abort_requirement,
+         ev->deaths,
+         ev->survivors,
+         ev->sort_max,
+         ev->verbose,
+         ev->min_quicksort,
+         ev->num_threads,
+         ev->overall_start,
+         ev->overall_end,
+         ev->i_mut_propability);
+}
+
 #endif /* end of EVOLUTION */

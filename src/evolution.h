@@ -467,5 +467,10 @@ uint64_t ev_size(int population_size,
                  uint64_t sizeof_iv, 
                  uint64_t sizeof_opt);
 
+/**
+ * prints informations about an given evolution
+ */
+void ev_inspect(Evolution *ev);
+
 
 #endif // end of EVOLUTION_HEADER
