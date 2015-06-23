@@ -114,15 +114,19 @@
  *
  * to all of the above combination an EV_SMIN / EV_SMAX can be added
  * standart is EV_SMIN
+ * Also an verbosytiy level of EV_VERBOSE_QUIET (EV_VEB0), EV_VERBOSE_ONELINE (EV_VEB1)
+ * and EV_VERBOSE_HIGH (EV_VEB2) can be added, standart is EV_VERBOSE_QUIET
  */
 Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
                             int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generation_limit, double mutation_propability,
-                                  double death_percentage, void *opts, char flags) {
+                                  double death_percentage, void *opts, short flags) {
 
   int tflags = flags & ~EV_SMAX;
+  tflags &= ~EV_VEB1;
+  tflags &= ~EV_VEB2;
   // valid flag combination ?
   if (tflags != EV_UREC && tflags != (EV_UREC|EV_UMUT) && tflags != (EV_UREC|EV_UMUT|EV_AMUT)
        && tflags != (EV_UREC|EV_KEEP) && tflags != (EV_UREC|EV_UMUT|EV_KEEP)
@@ -174,6 +178,7 @@ Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individ
   ev->keep_last_generation  = flags & EV_KEEP_LAST_GENERATION;
   ev->use_abort_requirement = flags & EV_USE_ABORT_REQUIREMENT;
   ev->sort_max              = flags & EV_SORT_MAX;
+  ev->verbose               = flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
 
   // multiplicator if we should discard the last generation, we can't recombinate in place
   int mul = ev->keep_last_generation ? 1 : 2;
@@ -187,9 +192,8 @@ Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individ
     ev->individuals[i].individual = init_individual(ev->opts);
     ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts);
 
-    #ifdef EVOLUTION_VERBOSE
-    printf("init population: %10d\r", population_size * mul - i);
-    #endif
+    if (ev->verbose >= EV_VERBOSE_ONELINE)
+      printf("init population: %10d\r", population_size * mul - i);
   }
 
   /**
@@ -201,9 +205,8 @@ Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individ
   else
     EVOLUTION_SELECTION_MIN(ev)
 
-  #ifdef EVOLUTION_EXTRA_VERBOSE
-  printf("Population Initialized\n");
-  #endif
+  if (ev->verbose >= EV_VERBOSE_HIGH)
+    printf("Population Initialized\n");
 
   return ev;
 }
@@ -220,12 +223,10 @@ Individual *evolute(Evolution *ev) {
   int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
   int survives = ev->population_size - deaths;
   int mutate   = (int) ((double) EVOLUTION_MUTATE_ACCURACY * ev->mutation_propability);
-  int improovs; 
+  EvolutionInfo info;
+  info.improovs = 0;
   Individual *tmp_iv;
-  improovs = 0;
-  #ifdef EVOLUTION_EXTRA_VERBOSE
-  char last_improovs[25];
-  #endif
+  char last_improovs_str[25];
 
   /**
    * Generation loop
@@ -236,7 +237,7 @@ Individual *evolute(Evolution *ev) {
   for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
                 || (ev->use_abort_requirement && ev->continue_ev(ev->individuals, ev->opts))); i++) {
     
-    improovs = 0;
+    info.improovs = 0;
   
     /**
      * If we keep the last generation, we can recombinate in place
@@ -276,19 +277,19 @@ Individual *evolute(Evolution *ev) {
         if (ev->sort_max) {
           if (ev->population[j]->fitness > ev->population[rand1]->fitness
                && ev->population[j]->fitness > ev->population[rand2]->fitness) 
-            improovs++;
+            info.improovs++;
 
         } else {
           if (ev->population[j]->fitness < ev->population[rand1]->fitness
                && ev->population[j]->fitness < ev->population[rand2]->fitness)
-            improovs++;
+            info.improovs++;
         }
 
 
-        #ifdef EVOLUTION_VERBOSE
-        printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", 
-                                            ev->generation_limit - i, end - j, last_improovs);
-        #endif
+        if (ev->verbose >= EV_VERBOSE_ONELINE) {
+          printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", 
+                                            ev->generation_limit - i, end - j, last_improovs_str);
+        }
       }
     // copy and mutate individuals
     } else {
@@ -307,18 +308,18 @@ Individual *evolute(Evolution *ev) {
            */
           if (ev->sort_max) {
             if (ev->population[j + start]->fitness > ev->population[j]->fitness) 
-              improovs++;
+              info.improovs++;
 
           } else {
             if (ev->population[j + start]->fitness < ev->population[j]->fitness) 
-              improovs++;
+              info.improovs++;
           }
          
          
-          #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
-                                            ev->generation_limit - i, start - j, last_improovs);
-          #endif
+          if (ev->verbose >= EV_VERBOSE_ONELINE) {
+            printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
+                                            ev->generation_limit - i, start - j, last_improovs_str);
+          }
         }
 
       // else choose random survivers to mutate
@@ -336,17 +337,18 @@ Individual *evolute(Evolution *ev) {
            */
           if (ev->sort_max) {
             if (ev->population[j]->fitness > ev->population[rand1]->fitness)
-              improovs++;
+              info.improovs++;
 
           } else {
             if (ev->population[j]->fitness < ev->population[rand1]->fitness)
-              improovs++;
+              info.improovs++;
           }
          
          
-          #ifdef EVOLUTION_VERBOSE
-          printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", ev->generation_limit - i, end - j, last_improovs);
-          #endif
+          if (ev->verbose >= EV_VERBOSE_ONELINE) {
+            printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", 
+                                          ev->generation_limit - i, end - j, last_improovs_str);
+          }
         }
       }
     }
@@ -355,7 +357,7 @@ Individual *evolute(Evolution *ev) {
     if (!ev->keep_last_generation) {
       
       /**
-       * sitch old and new generation to discard the old one
+       * switch old and new generation to discard the old one
        * which will be overidden next time
        */
       for (j = 0; j < ev->population_size; j++) {
@@ -374,16 +376,15 @@ Individual *evolute(Evolution *ev) {
     else
       EVOLUTION_SELECTION_MIN(ev)
 
-    #ifdef EVOLUTION_EXTRA_VERBOSE
-    sprintf(last_improovs,"%.5f", (improovs / (double) deaths) * 100.0);
-    printf("improovs: %10d -> %9s%%      best fitness: %10li                                                         \n", 
-              improovs, last_improovs, ev->population[0]->fitness);
-    #endif
+    if (ev->verbose >= EV_VERBOSE_HIGH) {
+      sprintf(last_improovs_str,"%.5f", (info.improovs / (double) deaths) * 100.0);
+      printf("improovs: %10d -> %9s%%      best fitness: %10li                                                         \n", 
+                info.improovs, last_improovs_str, ev->population[0]->fitness);
+    }
   }
 
-  #ifdef EVOLUTION_VERBOSE
-  printf("                                                                                           \r");
-  #endif
+  if (ev->verbose >= EV_VERBOSE_ONELINE)
+    printf("                                                                                           \r");
 
   // return the best
   return ev->population[0];
@@ -411,7 +412,7 @@ Individual best_evolution(void *(*init_individual) (void *), void (*clone_indivi
                             int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generation_limit, double mutation_propability,
-                                  double death_percentage, void *opts, char flags) {
+                                  double death_percentage, void *opts, short flags) {
 
   Evolution *ev = new_evolution(init_individual, clone_individual, free_individual, mutate,
                             fitness, recombinate, continue_ev, population_size, generation_limit, 

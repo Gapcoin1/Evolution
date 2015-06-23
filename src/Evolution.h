@@ -8,6 +8,13 @@
 #include <pthread.h>
 
 /**
+ * structur for aditional information during evolution
+ */
+typedef struct {
+ int improovs; 
+} EvolutionInfo;
+
+/**
  * Some Makros
  */
 #define EVOLUTION_TRUE  1
@@ -24,6 +31,9 @@
 #define EV_USE_ABORT_REQUIREMENT  16
 #define EV_SORT_MAX               32
 #define EV_SORT_MIN               0
+#define EV_VERBOSE_QUIET          0
+#define EV_VERBOSE_ONELINE        256
+#define EV_VERBOSE_HIGH           512
 
 /**
  * Shorter Flags
@@ -35,6 +45,9 @@
 #define EV_ABRT EV_USE_ABORT_REQUIREMENT
 #define EV_SMIN EV_SORT_MIN
 #define EV_SMAX EV_SORT_MAX
+#define EV_VEB0 EV_VERBOSE_QUIET
+#define EV_VEB1 EV_VERBOSE_ONELINE
+#define EV_VEB2 EV_VERBOSE_HIGH
 
 /**
  * An Individual wich has an definied fitness
@@ -131,7 +144,7 @@ Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individ
                             int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
-                                  double death_percentage, void *opts, char flags);
+                                  double death_percentage, void *opts, short flags);
 Individual *evolute(Evolution *ev);
 void evolution_clean_up(Evolution *ev);
 Individual best_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
@@ -139,7 +152,7 @@ Individual best_evolution(void *(*init_individual) (void *), void (*clone_indivi
                             int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
-                                  double death_percentage, void *opts, char flags);
+                                  double death_percentage, void *opts, short flags);
 
 
 #endif // end of EVOLUTION_HEADER
