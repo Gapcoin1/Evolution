@@ -113,7 +113,16 @@ struct Evolution {
   char use_abort_requirement;               /* if not true calculation will go on until generation limit es reatched */
   int generation_limit;                     /* maximum of generations to calculate (even if abort requirement is used) */
   char sort_max;                            /* if the individuals should be sorted by max or min fittnes */
-  void *opts;                               /* pointer to aditional opts which is given to each function */
+  void **opts;                              /* pointer to aditional opts which is given to each function */
+  short verbose;                            /* the verbosity level */
+  struct {
+    int i, start, end, num_threads, 
+        mutate, generations_progressed;
+    pthread_t *threads;
+    EvolutionThread *ev_threads;
+    char last_improovs_str[25];
+    EvolutionInfo info;
+  } parallel;
 };
 
 // functions
