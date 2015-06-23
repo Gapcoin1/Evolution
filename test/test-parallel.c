@@ -90,10 +90,24 @@ int main(int argc, char *argv[]) {
   Individual *best;
   int opts[10];
 
-  Evolution *ev = new_evolution_paralell(init_v, clone_v, free_v, mutate_v, fittnes_v,
-                          recombinate_v, NULL, TEST_NUM_IVS, atoi(argv[1]), 1.0, 0.5, (void **) &opts, 4,
-                             EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP);
-  best = evolute_paralell(ev);
+  EvInitArgs args;
+  args.init_individual      = init_v;
+  args.clone_individual     = clone_v;
+  args.free_individual      = free_v;
+  args.mutate               = mutate_v;
+  args.fitness              = fittnes_v;
+  args.recombinate          = recombinate_v;
+  args.continue_ev          = NULL;
+  args.population_size      = TEST_NUM_IVS;
+  args.generation_limit     = atoi(argv[1]);
+  args.mutation_propability = 1.0;
+  args.death_percentage     = 0.5;
+  args.opts                 = (void **) &opts;
+  args.num_threads          = 4;
+  args.flags                = EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP;
+
+  Evolution *ev = new_evolution(&args);
+  best = evolute(ev);
 
   #ifndef NO_OUTPUT
   Vektor *v = (Vektor *) best->individual;

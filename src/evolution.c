@@ -3,6 +3,10 @@
 #include "evolution.h"
 #include "C-Utils/Debug/src/debug.h"
 
+/* static functions */
+static char ev_flags_invalid(uint64_t flags);
+static char valid_args(EvInitArgs *args);
+
 // Evolution mutex
 static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -201,37 +205,116 @@ static inline char ev_equal(Individual *a, Individual *b) {
  *    EV_VERBOSE_ULTRA    (EV_VEB3)
  * can be added, standart is EV_VERBOSE_QUIET
  */
-Evolution *new_evolution(void *(*init_individual) (void *), 
-                         void (*clone_individual) (void *, void *, void *),
-                         void (*free_individual) (void *, void *), 
-                         void (*mutate) (Individual *, void *),
-                         int64_t (*fitness) (Individual *, void *), 
-                         void (*recombinate) (Individual *,
-                                              Individual *, 
-                                              Individual *, 
-                                              void *), 
-                         char (*continue_ev) (Individual *, void *),
-                         int population_size, 
-                         int generation_limit, 
-                         double mutation_propability,
-                         double death_percentage, 
-                         void *opts, 
-                         short flags) {
+Evolution *new_evolution(EvInitArgs *args) {
 
-  return new_evolution_paralell(init_individual, 
-                                clone_individual, 
-                                free_individual, 
-                                mutate, fitness, 
-                                recombinate, 
-                                continue_ev,
-                                population_size, 
-                                generation_limit, 
-                                mutation_propability, 
-                                death_percentage, 
-                                &opts, 
-                                1, 
-                                flags);
+  /* validates args */
+  if (!valid_args(args))
+    return NULL;
+
+  // int random
+  srand(time(NULL));
+
+  Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
+
+  /**
+   * multiplicator: if we should discard the last generation, 
+   * we can't recombinate in place
+   */
+  int mul = ev->keep_last_generation ? 1 : 2;
+  size_t population_space       = sizeof(Individual *) * args->population_size * mul;
+  size_t individuals_space      = sizeof(Individual) * args->population_size * mul;
+                                
+  ev->population                = (Individual **) malloc(population_space);
+  ev->individuals               = (Individual *) malloc(individuals_space);
+  ev->init_individual           = args->init_individual;
+  ev->clone_individual          = args->clone_individual;
+  ev->free_individual           = args->free_individual;
+  ev->mutate                    = args->mutate;
+  ev->fitness                   = args->fitness;
+  ev->recombinate               = args->recombinate;
+  ev->continue_ev               = args->continue_ev;
+  ev->population_size           = args->population_size;
+  ev->generation_limit          = args->generation_limit;
+  ev->mutation_propability      = args->mutation_propability;
+  ev->death_percentage          = args->death_percentage;
+  ev->opts                      = args->opts;
+  ev->paralell.num_threads      = args->num_threads;
+  ev->paralell.i                = 0;
+  ev->paralell.info.improovs    = 0;
+  ev->paralell.thread_clients   = malloc(sizeof(TClient) * args->num_threads);
+  ev->paralell.ev_threads       = malloc(sizeof(EvolutionThread) 
+                                         * args->num_threads);
+  ev->paralell.mutate           = (int) ((double) EV_MUT_ACCURACY 
+                                         * ev->mutation_propability);
+  ev->use_recombination          = args->flags & EV_USE_RECOMBINATION;
+  ev->use_muttation             = args->flags & EV_USE_MUTATION;
+  ev->always_mutate             = args->flags & EV_ALWAYS_MUTATE;
+  ev->keep_last_generation      = args->flags & EV_KEEP_LAST_GENERATION;
+  ev->use_abort_requirement     = args->flags & EV_USE_ABORT_REQUIREMENT;
+  ev->sort_max                  = args->flags & EV_SORT_MAX;
+  ev->verbose                   = args->flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
+  ev->min_quicksort             = EV_QICKSORT_MIN;
+
+  /**
+   * init thread lib
+   * max work will be death_percentage * num individuals
+   */
+  int i;
+  for (i = 0; i < args->num_threads; i++)
+    init_thread_client(&ev->paralell.thread_clients[i]);
+
+
+  ev->paralell.i = args->population_size * mul;
+
+  /* add work for the clients */
+  for (i = 0; i < args->num_threads; i++) {
+    ev->paralell.ev_threads[i].ev = ev;
+    ev->paralell.ev_threads[i].index = i;
+    tc_add_func(&ev->paralell.thread_clients[i], threadable_init_individual, (void *) &ev->paralell.ev_threads[i]);
+  }
+
+  // wait for threads
+  for (i = 0; i < args->num_threads; i++) {
+    tc_join(&ev->paralell.thread_clients[i]);
+  }
+
+  /**
+   * Select the best individuals to survive,
+   * Sort the Individuals by their fittnes
+   */
+  EV_SELECTION(ev); 
+
+  if (ev->verbose >= EV_VERBOSE_HIGH)
+    printf("Population Initialized\n");
+
+  return ev;
 }
+
+/**
+ * Returns wether the given EvInitArgs are valid or not
+ */
+static char valid_args(EvInitArgs *args) {
+
+  if (ev_flags_invalid(args->flags)) {
+    DBG_MSG("wrong flag combination");
+    return 0;
+  }
+
+  // valid other opts
+  if (args->population_size      <= 0  ||
+      args->generation_limit     <= 0  ||
+      args->mutation_propability < 0.0 ||
+      args->mutation_propability > 1.0 ||
+      args->death_percentage     < 0.0 ||
+      args->death_percentage     > 1.0) {
+   
+    DBG_MSG("wrong opts");
+    return 0;
+  }
+
+  return 1;
+}
+
 
 /**
  * Returns if a given flag combination is invalid
@@ -266,316 +349,6 @@ static char ev_flags_invalid(uint64_t flags) {
 }
 
 /**
- * Parallel version takes multiple opts pointer each one for each thread
- */
-Evolution *new_evolution_paralell(void *(*init_individual) (void *), 
-                                  void (*clone_individual) (void *, void *, void *),
-                                  void (*free_individual) (void *, void *), 
-                                  void (*mutate) (Individual *, void *),
-                                  int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                                     Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                      int population_size, int generation_limit, double mutation_propability,
-                                       double death_percentage, void **opts, int num_threads, short flags) {
-
-  if (ev_flags_invalid(flags)) {
-    DBG_MSG("wrong flag combination");
-    return NULL;
-  }
-
-  // valid other opts
-  if (population_size <= 0 
-      || generation_limit <= 0 
-      || mutation_propability < 0.0 
-      || mutation_propability > 1.0 
-      || death_percentage < 0.0 
-      || death_percentage > 1.0) {
-   
-    DBG_MSG("wrong opts");
-    return NULL;
-  }
-  
-  // int random
-  srand(time(NULL));
-
-  Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
-
-  /**
-   * multiplicator: if we should discard the last generation, 
-   * we can't recombinate in place
-   */
-  int mul = ev->keep_last_generation ? 1 : 2;
-  size_t population_space       = sizeof(Individual *) * population_size * mul;
-  size_t individuals_space      = sizeof(Individual) * population_size * mul;
-                                
-  ev->population                = (Individual **) malloc(population_space);
-  ev->individuals               = (Individual *) malloc(individuals_space);
-  ev->init_individual           = init_individual;
-  ev->clone_individual          = clone_individual;
-  ev->free_individual           = free_individual;
-  ev->mutate                    = mutate;
-  ev->fitness                   = fitness;
-  ev->recombinate               = recombinate;
-  ev->continue_ev               = continue_ev;
-  ev->population_size           = population_size;
-  ev->generation_limit          = generation_limit;
-  ev->mutation_propability      = mutation_propability;
-  ev->death_percentage          = death_percentage;
-  ev->opts                      = opts;
-  ev->paralell.num_threads      = num_threads;
-  ev->paralell.i                = 0;
-  ev->paralell.info.improovs    = 0;
-  ev->paralell.thread_clients   = malloc(sizeof(TClient) * num_threads);
-  ev->paralell.ev_threads       = malloc(sizeof(EvolutionThread) 
-                                         * num_threads);
-  ev->paralell.mutate           = (int) ((double) EV_MUT_ACCURACY 
-                                         * ev->mutation_propability);
-  ev->use_recombination          = flags & EV_USE_RECOMBINATION;
-  ev->use_muttation             = flags & EV_USE_MUTATION;
-  ev->always_mutate             = flags & EV_ALWAYS_MUTATE;
-  ev->keep_last_generation      = flags & EV_KEEP_LAST_GENERATION;
-  ev->use_abort_requirement     = flags & EV_USE_ABORT_REQUIREMENT;
-  ev->sort_max                  = flags & EV_SORT_MAX;
-  ev->verbose                   = flags & (EV_VERBOSE_ONELINE | EV_VERBOSE_HIGH);
-  ev->min_quicksort             = EV_QICKSORT_MIN;
-
-  /**
-   * init thread lib
-   * max work will be death_percentage * num individuals
-   */
-  int i;
-  for (i = 0; i < num_threads; i++)
-    init_thread_client(&ev->paralell.thread_clients[i]);
-
-
-  if (num_threads > 1) {
-    ev->paralell.i = population_size * mul;
-
-    /* add work for the clients */
-    for (i = 0; i < num_threads; i++) {
-      ev->paralell.ev_threads[i].ev = ev;
-      ev->paralell.ev_threads[i].index = i;
-      tc_add_func(&ev->paralell.thread_clients[i], threadable_init_individual, (void *) &ev->paralell.ev_threads[i]);
-    }
-
-    // wait for threads
-    for (i = 0; i < num_threads; i++) {
-      tc_join(&ev->paralell.thread_clients[i]);
-    }
-  } else {
-    for (i = 0; i < population_size * mul; i++) {
-      ev->population[i] = ev->individuals + i;
-      ev->individuals[i].individual = init_individual(ev->opts[0]);
-      ev->population[i]->fitness = ev->fitness(ev->population[i], ev->opts[0]);
- 
-      if (ev->verbose >= EV_VERBOSE_ONELINE)
-        printf("init population: %10d\r", population_size * mul - i);
-    }
-  }
-
-  /**
-   * Select the best individuals to survive,
-   * Sort the Individuals by their fittnes
-   */
-  EV_SELECTION(ev); 
-
-  if (ev->verbose >= EV_VERBOSE_HIGH)
-    printf("Population Initialized\n");
-
-  return ev;
-}
-
-/**
- * do the actual evolution, which means
- *  - calculate the fittnes for each Individual
- *  - sort Individual by fittnes
- *  - remove worst individuals
- *  - grow a new generation
- */
-Individual *evolute(Evolution *ev) {
-
-  int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
-  int survives = ev->population_size - deaths;
-  int mutate   = (int) ((double) EV_MUT_ACCURACY * ev->mutation_propability);
-  EvolutionInfo info;
-  info.improovs = 0;
-  Individual *tmp_iv;
-  char last_improovs_str[25];
-  sprintf(last_improovs_str, "Not knowen");
-
-  /**
-   * Generation loop
-   * each loop lets one generation grow kills the worst individuals
-   * and let new individuals born
-   */
-  int i, j, rand1, rand2, start, end;
-  for (i = 0; i < ev->generation_limit && (!ev->use_abort_requirement
-                || (ev->use_abort_requirement && ev->continue_ev(ev->individuals, ev->opts[0]))); i++) {
-    
-    info.improovs = 0;
-  
-    /**
-     * If we keep the last generation, we can recombinate in place
-     * else wen wirst calculate an new populion
-     */
-    start = ev->keep_last_generation ? survives : ev->population_size;
-    end   = ev->keep_last_generation ? ev->population_size : ev->population_size * 2; 
-
-
-    if (ev->use_recombination) {
-      for (j = start; j < end; j++) {
-
-        // from 2 Individuals of the untouched part we calculate an new one
-        rand2 = rand1 = rand() % start;
-        while (rand1 == rand2) rand2 = rand() % start; // TODO prevent endless loop if one one idividual survives
-        
-        // recombinate individuals
-        ev->recombinate(ev->population[rand1], ev->population[rand2], ev->population[j], ev->opts[0]);
-        
-        // mutate Individuals
-        if (ev->use_muttation) {
-          if (ev->always_mutate)
-            ev->mutate(ev->population[j], ev->opts[0]);
-          else {
-            rand1 = rand() % EV_MUT_ACCURACY;
-            if (rand1 <= mutate)
-              ev->mutate(ev->population[j], ev->opts[0]);
-          }
-        }
-
-        // calculate the fittnes for the new individual
-        ev->population[j]->fitness = ev->fitness(ev->population[j], ev->opts[0]);
-
-        /**
-         * store if the new individual is better as the old one
-         */
-        if (ev->sort_max) {
-          if (ev->population[j]->fitness > ev->population[rand1]->fitness
-               && ev->population[j]->fitness > ev->population[rand2]->fitness) 
-            info.improovs++;
-
-        } else {
-          if (ev->population[j]->fitness < ev->population[rand1]->fitness
-               && ev->population[j]->fitness < ev->population[rand2]->fitness)
-            info.improovs++;
-        }
-
-
-        if (ev->verbose >= EV_VERBOSE_ONELINE) {
-          printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\r", 
-                                            ev->generation_limit - i, end - j, last_improovs_str);
-        }
-        if (ev->verbose >= EV_VERBOSE_ULTRA) {
-          printf("Evolution: generation left %10d tasks recombination %10d improovs %9s%%\n", 
-                                            ev->generation_limit - i, end - j, last_improovs_str);
-        }
-      }
-    // copy and mutate individuals
-    } else {
-      
-      // if deaths == survives, make sure that all survivers are being copyed and mutated
-      if (start * 2 == end) {
-        for (j = 0; j < start; j++) {
-          ev->clone_individual(ev->population[j + start]->individual, ev->population[j]->individual, ev->opts[0]);
-          ev->mutate(ev->population[j + start], ev->opts[0]);
-
-          // calculate the fittnes for the new individual
-          ev->population[j + start]->fitness = ev->fitness(ev->population[j + start], ev->opts[0]);
-         
-          /**
-           * store if the new individual is better as the old one
-           */
-          if (ev->sort_max) {
-            if (ev->population[j + start]->fitness > ev->population[j]->fitness) 
-              info.improovs++;
-
-          } else {
-            if (ev->population[j + start]->fitness < ev->population[j]->fitness) 
-              info.improovs++;
-          }
-         
-         
-          if (ev->verbose >= EV_VERBOSE_ONELINE) {
-            printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\r", 
-                                            ev->generation_limit - i, start - j, last_improovs_str);
-          }
-          if (ev->verbose >= EV_VERBOSE_ULTRA) {
-            printf("Evolution: generation left %10d tasks mutation-1/2 %10d improovs %9s%%\n", 
-                                            ev->generation_limit - i, start - j, last_improovs_str);
-          }
-        }
-
-      // else choose random survivers to mutate
-      } else {
-        for (j = start; j < end; j ++) {
-          rand1 = rand() % start;
-          ev->clone_individual(ev->population[j]->individual, ev->population[rand1]->individual, ev->opts[0]);
-          ev->mutate(ev->population[j], ev->opts[0]);
-
-          // calculate the fittnes for the new individual
-          ev->population[j]->fitness = ev->fitness(ev->population[j], ev->opts[0]);
-         
-          /**
-           * store if the new individual is better as the old one
-           */
-          if (ev->sort_max) {
-            if (ev->population[j]->fitness > ev->population[rand1]->fitness)
-              info.improovs++;
-
-          } else {
-            if (ev->population[j]->fitness < ev->population[rand1]->fitness)
-              info.improovs++;
-          }
-         
-         
-          if (ev->verbose >= EV_VERBOSE_ONELINE) {
-            printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\r", 
-                                          ev->generation_limit - i, end - j, last_improovs_str);
-          }
-          if (ev->verbose >= EV_VERBOSE_ULTRA) {
-            printf("Evolution: generation left %10d tasks mutation-1/x %10d improovs %9s%%\n", 
-                                          ev->generation_limit - i, end - j, last_improovs_str);
-          }
-        }
-      }
-    }
-  
-
-    if (!ev->keep_last_generation) {
-      
-      /**
-       * switch old and new generation to discard the old one
-       * which will be overidden next time
-       */
-      for (j = 0; j < ev->population_size; j++) {
-        tmp_iv = ev->population[j];
-        ev->population[j] = ev->population[ev->population_size + j];
-        ev->population[ev->population_size + j] = tmp_iv;
-      }
-    }
-
-    /**
-     * Select the best individuals to survive,
-     * Sort the Individuals by theur fittnes
-     */
-    EV_SELECTION(ev);
-
-    if (ev->verbose >= EV_VERBOSE_ONELINE)
-      sprintf(last_improovs_str, "%.5f", (info.improovs / (double) deaths) * 100.0);
-
-    if (ev->verbose >= EV_VERBOSE_HIGH) {
-      printf("improovs: %10d -> %9s%%      best fitness: %10li                                                         \n", 
-                info.improovs, last_improovs_str, ev->population[0]->fitness);
-    }
-  }
-
-  if (ev->verbose >= EV_VERBOSE_ONELINE)
-    printf("                                                                                           \r");
-
-  // return the best
-  return ev->population[0];
-}
-
-/**
  * Frees unneded resauces after an evolution calculation
  */
 void evolution_clean_up(Evolution *ev) {
@@ -592,39 +365,11 @@ void evolution_clean_up(Evolution *ev) {
  * Computes an evolution for the given params
  * and returns the best Individual
  */
-Individual best_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                int population_size, int generation_limit, double mutation_propability,
-                                  double death_percentage, void *opts, short flags) {
+Individual best_evolution(EvInitArgs *args) {
 
-  Evolution *ev = new_evolution(init_individual, clone_individual, free_individual, mutate,
-                            fitness, recombinate, continue_ev, population_size, generation_limit, 
-                              mutation_propability, death_percentage, opts, flags);
+  Evolution *ev = new_evolution(args);
 
   Individual best = *evolute(ev);
-  evolution_clean_up(ev);
-
-  return best;
-}
-
-/**
- * Computes an evolution for the given params
- * and returns the best Individual paralell version
- */
-Individual best_evolution_paralell(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                int population_size, int generation_limit, double mutation_propability,
-                                  double death_percentage, void **opts, int num_threads, short flags) {
-
-  Evolution *ev = new_evolution_paralell(init_individual, clone_individual, free_individual, mutate,
-                            fitness, recombinate, continue_ev, population_size, generation_limit, 
-                              mutation_propability, death_percentage, opts, num_threads, flags);
-
-  Individual best = *evolute_paralell(ev);
   evolution_clean_up(ev);
 
   return best;
@@ -674,7 +419,7 @@ void *threadable_init_individual(void *arg) {
  *
  * Parallel version
  */
-Individual *evolute_paralell(Evolution *ev) {
+Individual *evolute(Evolution *ev) {
 
   int deaths   = (int) ((double) ev->population_size * ev->death_percentage);
   int survives = ev->population_size - deaths;
@@ -1000,17 +745,17 @@ void *threadable_mutation_onely_rand(void *arg) {
 /**
  * returns the Size an Evolution with the given args will have
  */
-u_int64_t ev_size(int population_size, int num_threads, int keep_last_generation, 
-                                        u_int64_t sizeof_iv, u_int64_t sizeof_opt) {
+uint64_t ev_size(int population_size, int num_threads, int keep_last_generation, 
+                                        uint64_t sizeof_iv, uint64_t sizeof_opt) {
   
-  u_int64_t mul = keep_last_generation ? 1 : 2;
+  uint64_t mul = keep_last_generation ? 1 : 2;
 
-  u_int64_t size = (u_int64_t) sizeof(Evolution);
-  size += (u_int64_t) sizeof(EvolutionThread) * num_threads;
-  size += (u_int64_t) sizeof(pthread_t) * num_threads;
+  uint64_t size = (uint64_t) sizeof(Evolution);
+  size += (uint64_t) sizeof(EvolutionThread) * num_threads;
+  size += (uint64_t) sizeof(pthread_t) * num_threads;
   size += sizeof_opt * num_threads;
-  size += (u_int64_t) sizeof(Individual *) * population_size * mul;
-  size += (u_int64_t) sizeof(Individual) * population_size * mul;
+  size += (uint64_t) sizeof(Individual *) * population_size * mul;
+  size += (uint64_t) sizeof(Individual) * population_size * mul;
   size += sizeof_iv * population_size * mul;
 
   return size;

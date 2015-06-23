@@ -154,40 +154,19 @@ struct Evolution {
 
 
 // functions
-Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                int population_size, int generations_limit, double mutation_propability,
-                                  double death_percentage, void *opts, short flags);
 Individual *evolute(Evolution *ev);
-void evolution_clean_up(Evolution *ev);
-Individual best_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                int population_size, int generations_limit, double mutation_propability,
-                                  double death_percentage, void *opts, short flags);
-u_int64_t ev_size(int population_size, int num_threads, int keep_last_generation, 
-                                        u_int64_t sizeof_iv, u_int64_t sizeof_opt);
-// paralell functions
-Evolution *new_evolution_paralell(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                                   void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                                    int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                                     Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                      int population_size, int generation_limit, double mutation_propability,
-                                       double death_percentage, void **opts, int num_threads, short flags);
-Individual best_evolution_paralell(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
-                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int64_t (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
-                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
-                                int population_size, int generations_limit, double mutation_propability,
-                                  double death_percentage, void **opts, int num_threads, short flags);
+Evolution  *new_evolution(EvInitArgs *args);  // TODO add description to each function declaration
+Individual best_evolution(EvInitArgs *args);
 void *threadable_init_individual(void *arg);
-Individual *evolute_paralell(Evolution *ev);
 void *threadable_recombinate(void *arg);
 void *threadable_mutation_onely_1half(void *args);
 void *threadable_mutation_onely_rand(void *args);
+void evolution_clean_up(Evolution *ev);
+uint64_t ev_size(int population_size, 
+                 int num_threads, 
+                 int keep_last_generation, 
+                 uint64_t sizeof_iv, 
+                 uint64_t sizeof_opt);
 
 
 #endif // end of EVOLUTION_HEADER
