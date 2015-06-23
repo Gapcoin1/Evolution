@@ -83,6 +83,15 @@ typedef struct {
   chiefsort_max(EVOLUTION->population, EVOLUTION->population_size, EV_MIN_QUICKSORT);
 
 /**
+ * Struct holding information for threads
+ */
+typedef struct Evolution Evolution;
+typedef struct {
+  Evolution *ev;
+  int index;
+} EvolutionThread;
+
+/**
  * Structur holding the Individual Population.
  * It also holds an recombination, mutation and fitness function
  * So as an Mutation probability
@@ -99,7 +108,6 @@ typedef struct {
  *
  * NOTE each function get an additional void pointer to with is used for specific args
  */
-typedef struct Evolution Evolution;
 struct Evolution {
   void *(*init_individual) (void *);        /* function to initialzes an Individual */
   void (*clone_individual) (void *,         /* function clones an individual */
@@ -138,6 +146,10 @@ struct Evolution {
   } parallel;
 };
 
+
+// Evolution mutex
+static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // functions
 Evolution *new_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
@@ -153,6 +165,24 @@ Individual best_evolution(void *(*init_individual) (void *), void (*clone_indivi
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generations_limit, double mutation_propability,
                                   double death_percentage, void *opts, short flags);
+// parallel functions
+Evolution *new_evolution_parallel(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+                                   void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
+                                    int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                                     Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
+                                      int population_size, int generation_limit, double mutation_propability,
+                                       double death_percentage, void **opts, int num_threads, short flags);
+Individual best_evolution_parallel(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
+                          void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
+                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                              Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
+                                int population_size, int generations_limit, double mutation_propability,
+                                  double death_percentage, void **opts, int num_threads, short flags);
+void *threadable_init_individual(void *arg);
+Individual *evolute_parallel(Evolution *ev);
+void *threadable_recombinate(void *arg);
+void *threadable_mutation_onely_1half(void *args);
+void *threadable_mutation_onely_rand(void *args);
 
 
 #endif // end of EVOLUTION_HEADER
