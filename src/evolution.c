@@ -2,6 +2,9 @@
 #define EVOLUTION
 #include "evolution.h"
 
+// Evolution mutex
+static pthread_mutex_t ev_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /**
  * Functions for Sorting the Population by Fitness
  * Macro versions
@@ -19,15 +22,15 @@ static inline char macro_equal(Individual *a, Individual *b) {
 }
 
 /* void pointer version */
-char macro_bigger(void *a, void *b) {
+char void_ptr_bigger(void *a, void *b) {
   return ((Individual *) a)->fitness > ((Individual *) b)->fitness;
 }
 
-char macro_smaler(void *a, void *b) {
+char void_ptr_smaler(void *a, void *b) {
   return ((Individual *) a)->fitness < ((Individual *) b)->fitness;
 }
 
-char macro_equal(void *a, void *b) {
+char void_ptr_equal(void *a, void *b) {
   return ((Individual *) a)->fitness == ((Individual *) b)->fitness;
 }
 
@@ -77,8 +80,11 @@ char macro_equal(void *a, void *b) {
  * |                                    | the calculaten should continue      |
  * +------------------------------------+-------------------------------------+
  *
- * Note: the void pointer to individuals are not pointer to an Individual 
- *       struct, they are the individual element of the Individual struct
+ * Note: - The void pointer to individuals are not pointer to an Individual 
+ *         struct, they are the individual element of the Individual struct.
+ *       - The last parameter of each function (opts) is an void pointer to 
+ *         optional arguments of your choice
+ *
  *
  * flags can be:
  *
@@ -185,7 +191,7 @@ Evolution *new_evolution(void *(*init_individual) (void *),
                          void (*clone_individual) (void *, void *, void *),
                          void (*free_individual) (void *, void *), 
                          void (*mutate) (Individual *, void *),
-                         int (*fitness) (Individual *, void *), 
+                         long (*fitness) (Individual *, void *), 
                          void (*recombinate) (Individual *,
                                               Individual *, 
                                               Individual *, 
@@ -220,7 +226,7 @@ Evolution *new_evolution_parallel(void *(*init_individual) (void *),
                                   void (*clone_individual) (void *, void *, void *),
                                   void (*free_individual) (void *, void *), 
                                   void (*mutate) (Individual *, void *),
-                                    int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                                    long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                                      Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                       int population_size, int generation_limit, double mutation_propability,
                                        double death_percentage, void **opts, int num_threads, short flags) {
@@ -324,10 +330,34 @@ Evolution *new_evolution_parallel(void *(*init_individual) (void *),
    * Select the best individuals to survive,
    * Sort the Individuals by their fittnes
    */
-  if (ev->sort_max)
-    EVOLUTION_SELECTION_MAX(ev)
-  else
-    EVOLUTION_SELECTION_MIN(ev)
+  if (ev->sort_max) {
+    if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
+      parallel_quickinsersort_max(&ev->parallel.sort_args); // TODO init sort_args, n_threads_sort_parallel, min_quicksort
+    } 
+    else {
+      QUICK_INSERT_SORT_MAX(Individual *, 
+                            ev->population, 
+                            ev->population_size, 
+                            macro_bigger, 
+                            macro_smaler, 
+                            macro_smaler,
+                            ev->min_quicksort);
+    }
+  }
+  else {
+    if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
+      parallel_quickinsersort_min(&ev->parallel.sort_args);
+    } 
+    else {
+      QUICK_INSERT_SORT_MIN(Individual *, 
+                            ev->population, 
+                            ev->population_size, 
+                            macro_bigger, 
+                            macro_smaler, 
+                            macro_smaler,
+                            ev->min_quicksort);
+    }
+  }
 
   if (ev->verbose >= EV_VERBOSE_HIGH)
     printf("Population Initialized\n");
@@ -509,8 +539,8 @@ Individual *evolute(Evolution *ev) {
      * Sort the Individuals by theur fittnes
      */
     if (ev->sort_max) {
-      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
-        paralell_quickinsersort_max(&ev->paralell.sort_args);
+      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
+        parallel_quickinsersort_max(&ev->parallel.sort_args);
       } 
       else {
         QUICK_INSERT_SORT_MAX(Individual *, 
@@ -523,8 +553,8 @@ Individual *evolute(Evolution *ev) {
       }
     }
     else {
-      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
-        paralell_quickinsersort_min(&ev->paralell.sort_args);
+      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
+        parallel_quickinsersort_min(&ev->parallel.sort_args);
       } 
       else {
         QUICK_INSERT_SORT_MIN(Individual *, 
@@ -572,7 +602,7 @@ void evolution_clean_up(Evolution *ev) {
  */
 Individual best_evolution(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                            long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generation_limit, double mutation_propability,
                                   double death_percentage, void *opts, short flags) {
@@ -593,7 +623,7 @@ Individual best_evolution(void *(*init_individual) (void *), void (*clone_indivi
  */
 Individual best_evolution_parallel(void *(*init_individual) (void *), void (*clone_individual) (void *, void *, void *),
                           void (*free_individual) (void *, void *), void (*mutate) (Individual *, void *),
-                            int (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
+                            long (*fitness) (Individual *, void *), void (*recombinate) (Individual *,
                               Individual *, Individual *, void *), char (*continue_ev) (Individual *, void *),
                                 int population_size, int generation_limit, double mutation_propability,
                                   double death_percentage, void **opts, int num_threads, short flags) {
@@ -622,8 +652,8 @@ void *threadable_init_individual(void *arg) {
       if (ev->parallel.i <= 0)
         break;
  
-      i = ev->parallel.i;
       ev->parallel.i--;
+      i = ev->parallel.i;
     pthread_mutex_unlock(&ev_mutex);
  
     ev->population[i] = ev->individuals + i;
@@ -748,8 +778,8 @@ Individual *evolute_parallel(Evolution *ev) {
      * Sort the Individuals by theur fittnes
      */
     if (ev->sort_max) {
-      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
-        paralell_quickinsersort_max(&ev->paralell.sort_args);
+      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
+        parallel_quickinsersort_max(&ev->parallel.sort_args);
       } 
       else {
         QUICK_INSERT_SORT_MAX(Individual *, 
@@ -762,8 +792,8 @@ Individual *evolute_parallel(Evolution *ev) {
       }
     }
     else {
-      if (ev->paralell.num_threads >= ev->paralell.n_threads_sort_paralell) {
-        paralell_quickinsersort_min(&ev->paralell.sort_args);
+      if (ev->parallel.num_threads >= ev->parallel.n_threads_sort_parallel) {
+        parallel_quickinsersort_min(&ev->parallel.sort_args);
       } 
       else {
         QUICK_INSERT_SORT_MIN(Individual *, 
@@ -885,7 +915,7 @@ void *threadable_mutation_onely_1half(void *arg) {
   while (1) {
 
     pthread_mutex_lock(&ev_mutex);
-      if (ev->parallel.i >= ev->parallel.end)
+      if (ev->parallel.i + ev->parallel.start >= ev->parallel.end)
         break;
       
       j = ev->parallel.i;

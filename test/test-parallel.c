@@ -9,7 +9,7 @@
 #define NULL 0
 #endif
 
-#include "../src/Evolution.h"
+#include "../src/evolution.h"
 
 typedef struct {
   int a, b, c, d, e, f;
@@ -71,7 +71,7 @@ void mutate_v(Individual *src, void *opts) {
     v->f += (rand() % 3) - 1;
 }
 
-int fittnes_v(Individual *src, void *opts) {
+long fittnes_v(Individual *src, void *opts) {
   (void) opts;
   Vektor *v = (Vektor *) src->individual;
 
@@ -81,8 +81,6 @@ int fittnes_v(Individual *src, void *opts) {
 }
 
 int main(int argc, char *argv[]) {
-
-  (void) ev_mutex;
 
   if (argc <= 1) {
     printf("%s <num generations>\n", argv[0]);
