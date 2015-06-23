@@ -1,5 +1,6 @@
 /**
- * Evolution test with Simple extended example fom Wikipedia: http://de.wikipedia.org/wiki/Evolutionärer_Algorithmus
+ * Evolution test with Simple extended example fom Wikipedia: 
+ * http://de.wikipedia.org/wiki/Evolutionärer_Algorithmus
  *
  * using an Vektor of ints as an Idividum
  */
@@ -45,7 +46,10 @@ void free_v(void *dst, void *opts) {
   free((Vektor *) dst);
 }
 
-void recombinate_v(Individual *src1, Individual *src2, Individual *dst, void *opts) {
+void recombinate_v(Individual *src1, 
+                   Individual *src2, 
+                   Individual *dst, 
+                   void *opts) {
   (void) opts;
   Vektor *vs1 = (Vektor *) src1->iv;
   Vektor *vs2 = (Vektor *) src2->iv;
@@ -82,18 +86,28 @@ int64_t fittnes_v(Individual *src, void *opts) {
 
 int main(int argc, char *argv[]) {
 
-  if (argc <= 1) {
-    printf("%s <num generations>\n", argv[0]);
+  if (argc != 4) {
+    printf("%s <num generations> <num threads> <verbose level(0-3)>\n", 
+           argv[0]);
     exit(1);
+  }
+
+  int verbose = EV_VEB0;
+
+  switch (atoi(argv[3])) {
+    case 1:   verbose = EV_VEB1; break;
+    case 2:   verbose = EV_VEB2; break;
+    case 3:   verbose = EV_VEB3; break;
+    default : verbose = EV_VEB0; 
   }
 
   Individual *best;
   int opts[10];
 
   EvInitArgs args;
-  args.init_iv      = init_v;
-  args.clone_iv     = clone_v;
-  args.free_iv      = free_v;
+  args.init_iv              = init_v;
+  args.clone_iv             = clone_v;
+  args.free_iv              = free_v;
   args.mutate               = mutate_v;
   args.fitness              = fittnes_v;
   args.recombinate          = recombinate_v;
@@ -103,8 +117,8 @@ int main(int argc, char *argv[]) {
   args.mutation_propability = 1.0;
   args.death_percentage     = 0.5;
   args.opts                 = (void **) &opts;
-  args.num_threads          = 4;
-  args.flags                = EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_VERBOSE_HIGH;
+  args.num_threads          = atoi(argv[2]);
+  args.flags                = EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|verbose;
 
   Evolution *ev = new_evolution(&args);
   best = evolute(ev);
@@ -113,16 +127,28 @@ int main(int argc, char *argv[]) {
   Vektor *v = (Vektor *) best->iv;
 
 
-  printf("Best Vektor: (%3d, %3d, %3d, %3d, %3d, %3d) %10li\n\n", v->a, v->b, v->c, v->d, v->e, v->f, 
-            best->fitness);
+  printf("Best Vektor: (%3d, %3d, %3d, %3d, %3d, %3d) %10li\n\n", 
+         v->a, 
+         v->b, 
+         v->c, 
+         v->d, 
+         v->e, 
+         v->f, 
+         best->fitness);
 
   int i;
   for (i = 0; i < TEST_NUM_IVS; i++) {
     best = ev->population[i];
     v = (Vektor *) best->iv;
 
-    printf("(%3d, %3d, %3d, %3d, %3d, %3d) %10li\n", v->a, v->b, v->c, v->d, v->e, v->f, 
-              best->fitness);
+    printf("(%3d, %3d, %3d, %3d, %3d, %3d) %10li\n", 
+           v->a, 
+           v->b, 
+           v->c, 
+           v->d,
+           v->e, 
+           v->f, 
+           best->fitness);
   }
   #else
   (void) best;

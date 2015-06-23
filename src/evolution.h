@@ -343,11 +343,16 @@ typedef const struct {
  * | int parallel_index                 | used to syncornize the parallel     |
  * |                                    | access of the individuals during    |
  * |                                    | initializing, recombination usw.    |
+ * |                                    | It will be decremented an used for  |
+ * |                                    | the area where the individuals will |
+ * |                                    | cosen for mutation usw.             |
  * |                                    |                                     |
- * | int parallel_start                 | indicates where to start parallel   |
+ * | int parallel_start                 | indicates where to start repleacing |
+ * |                                    | individuals during parallel         |
  * |                                    | calculation (array index)           |
  * |                                    |                                     |
- * | int parallel_end                   | indicates where to end parallel     |
+ * | int parallel_end                   | indicates where to end repleacing   |
+ * |                                    | individuals during parallel         |
  * |                                    | calculation (array index)           |
  * |                                    |                                     |
  * | int i_mut_propability              | because int rand() is faster than   |
