@@ -4,10 +4,11 @@
  */
 #include "../src/evolution.h"
 #include "../src/C-Utils/Rand/src/rand.h"
+#include <time.h>
 
 typedef struct {
   int length;
-  int i;
+  uint32_t rand;
 } ThreadArgs;
 
 void *init_v(void *opts) {
@@ -18,7 +19,7 @@ void *init_v(void *opts) {
   int *ary = malloc(sizeof(int) * args->length);
 
   for (i = 0; i < args->length; i++)
-    ary[i] = rand32(args->i) - (RAND_MAX / 2);
+    ary[i] = rand32(&args->rand) - (RAND_MAX / 2);
 
   return ary;
 }
@@ -49,7 +50,7 @@ void recombinate_v(Individual *src1,
   int *vd  = (int *) dst->iv;
 
   for (i = 0; i < args->length; i++)
-    vd[i] = (rand32(args->i) % 2) ? vs1[i] : vs2[i];
+    vd[i] = (rand32(&args->rand) % 2) ? vs1[i] : vs2[i];
   
 }
 
@@ -59,9 +60,9 @@ void mutate_v(Individual *src, void *opts) {
   int i, r, *ary = src->iv;
 
   for (i = 0; i < args->length; i++) {
-    r = (rand32(args->i) % 3) - 1;
+    r = (rand32(&args->rand) % 3) - 1;
 
-    ary[i] = (rand32(args->i) % 100) ? ary[i] : ary[i] + r;
+    ary[i] = (rand32(&args->rand) % 100) ? ary[i] : ary[i] + r;
   }
 
 }
@@ -91,7 +92,6 @@ int main(int argc, char *argv[]) {
   int verbose = EV_VEB0;
   int  n_threads = atoi(argv[2]);
 
-  init_rand32(n_threads);
 
   switch (atoi(argv[3])) {
     case 1:   verbose = EV_VEB1; break;
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
   for (i = 0; i < n_threads; i++) {
     opts[i] = malloc(sizeof(ThreadArgs));
     opts[i]->length = length;
-    opts[i]->i      = i;
+    opts[i]->rand   = time(NULL) ^ i;
   }
 
   EvInitArgs args;

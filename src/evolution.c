@@ -2,7 +2,6 @@
 #define EVOLUTION
 #include "evolution.h"
 #include "C-Utils/Debug/src/debug.h"
-#include "C-Utils/Rand/src/rand.h"
 
 
 /* Evolution mutex */
@@ -272,12 +271,14 @@ Evolution *new_evolution(EvInitArgs *args) {
   if (!valid_args(args))
     return NULL;
 
-  /* int random */
-  init_rand32_serial(time(NULL));
-  init_rand32(args->num_threads);
-
   /* create new Evolution */
   Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
+
+  /* int random */
+  ev->rands = (rand128_t **) malloc(sizeof(rand128_t *) * args->num_threads);
+  int i;
+  for (i = 0; i < args->num_threads; i++)
+    ev->rands[i] = new_rand128(time(NULL) ^ i);
 
   /**
    * multiplicator: if we should discard the last generation, 
@@ -526,12 +527,15 @@ void evolution_clean_up(Evolution *ev) {
   for (i = 0; i < ev->num_threads && ev->num_threads > 1; i++) {
     free(ev->thread_args[i]);
     tc_free(&ev->thread_clients[i]);
+    free(ev->rands[i]);
   }
   
   if (ev->num_threads > 1) {
     free((void *) ev->thread_args);
     free(ev->thread_clients);
   }
+
+  free(ev->rands);
 }
 
 /**
@@ -857,6 +861,7 @@ static void *threadable_recombinate(void *arg) {
   EvThreadArgs *evt = arg;
   Evolution *ev     = evt->ev;
   int j, rand1, rand2;
+  rand128_t *v_rand = evt->ev->rands[evt->index];
 
   /**
    * for recombination there musst be min two individuals
@@ -878,8 +883,8 @@ static void *threadable_recombinate(void *arg) {
      * from two randomly choosen Individuals 
      * of the untouched (best) part we calculate an new one 
      * */
-    rand2 = rand1 = rand32(evt->index) % ev->overall_start;
-    while (rand1 == rand2) rand2 = rand32(evt->index) % ev->overall_start; 
+    rand2 = rand1 = rand128(v_rand) % ev->overall_start;
+    while (rand1 == rand2) rand2 = rand128(v_rand) % ev->overall_start; 
     
     /* recombinate individuals */
     ev->recombinate(ev->population[rand1], 
@@ -892,7 +897,7 @@ static void *threadable_recombinate(void *arg) {
       if (ev->always_mutate)
         ev->mutate(ev->population[j], evt->opt);
       else {
-        if (rand32(evt->index) <= ev->i_mut_propability)
+        if (rand128(v_rand) <= ev->i_mut_propability)
           ev->mutate(ev->population[j], evt->opt);
       }
     }
@@ -1007,6 +1012,7 @@ static void *threadable_mutation_onely_rand(void *arg) {
   EvThreadArgs *evt = arg;
   Evolution *ev = evt->ev;
   int j, rand1;
+  rand128_t *v_rand = evt->ev->rands[evt->index];
 
   /* reset threadwide iprooves */
   evt->improovs = 0;  
@@ -1020,7 +1026,7 @@ static void *threadable_mutation_onely_rand(void *arg) {
      * clone random individual (from the survivors)
      * and override the current individual in the deaths-part
      */
-    rand1 = rand32(evt->index) % ev->overall_start;
+    rand1 = rand128(v_rand) % ev->overall_start;
     ev->clone_iv(ev->population[j]->iv, 
                  ev->population[rand1]->iv, 
                  evt->opt);
@@ -1076,6 +1082,8 @@ uint64_t ev_size(int population_size,
   uint64_t size = (uint64_t) sizeof(Evolution);
   size += (uint64_t) sizeof(EvThreadArgs) * num_threads;
   size += (uint64_t) sizeof(TClient)      * num_threads;
+  size += (uint64_t) sizeof(rand128_t *)  * num_threads;
+  size += (uint64_t) sizeof(rand128_t)    * num_threads;
   size += sizeof_opt * num_threads;
   size += (uint64_t) sizeof(Individual *) * population_size * mul;
   size += (uint64_t) sizeof(Individual)   * population_size * mul;
@@ -1178,8 +1186,8 @@ static void seriel_recombinate(Evolution *ev) {
      * from two randomly choosen Individuals 
      * of the untouched (best) part we calculate an new one 
      * */
-    rand2 = rand1 = rand32() % ev->overall_start;
-    while (rand1 == rand2) rand2 = rand32() % ev->overall_start; 
+    rand2 = rand1 = rand128(ev->rands[0]) % ev->overall_start;
+    while (rand1 == rand2) rand2 = rand128(ev->rands[0]) % ev->overall_start; 
     
     /* recombinate individuals */
     ev->recombinate(ev->population[rand1], 
@@ -1192,7 +1200,7 @@ static void seriel_recombinate(Evolution *ev) {
       if (ev->always_mutate)
         ev->mutate(ev->population[j], *ev->opts);
       else {
-        if (rand32() <= ev->i_mut_propability)
+        if (rand128(ev->rands[0]) <= ev->i_mut_propability)
           ev->mutate(ev->population[j], *ev->opts);
       }
     }
@@ -1312,7 +1320,7 @@ static void seriel_mutation_onely_rand(Evolution *ev) {
      * clone random individual (from the survivors)
      * and override the current individual in the deaths-part
      */
-    rand1 = rand32() % ev->overall_start;
+    rand1 = rand128(ev->rands[0]) % ev->overall_start;
     ev->clone_iv(ev->population[j]->iv, 
                  ev->population[rand1]->iv, 
                  *ev->opts);

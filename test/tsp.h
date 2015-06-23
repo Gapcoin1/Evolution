@@ -7,6 +7,7 @@
 #include "../src/C-Utils/Dynamic-Array/src/dynamic-array.h"
 #include "../src/C-Utils/Sort/src/sort.h"
 #include "../src/evolution.h"
+#include "../src/C-Utils/Rand/src/rand.h"
 
 /**
  * uint32_t array
@@ -54,6 +55,7 @@ typedef struct {
   UI32Ary citys;            /* indexes of all citys */
   UI32Ary tmp;              /* temp array for calculation */
   double  mut_size_reduce;  /* pecentage to controll the mutation size */
+  rand128_t *rand;          /* random value */
 } TSPEvolution;
 
 #endif /* __TSP_H__ */

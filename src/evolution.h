@@ -9,6 +9,7 @@
 #define EVOLUTION_HEADER
 #include "C-Utils/Sort/src/sort.h"
 #include "C-Utils/Thread-Clients/src/thread-client.h"
+#include "C-Utils/Rand/src/rand.h"
 
 /**
  * Macro for changing TC to pthread
@@ -295,11 +296,11 @@ typedef struct {
  */
 typedef struct {
   Evolution *const ev;    /* pointer to the current Evolution struct    */
-  int  index;             /* index of the current working thread        */
-  int  start;             /* start and end index for repleacing         */ 
-  int  end;               /* individuals of the current working thread  */ 
-  int  improovs;          /* improovs of the current thread             */
-  void *const opt;        /* opts for the current thread                */
+  int       index;        /* index of the current working thread        */
+  int       start;        /* start and end index for repleacing         */ 
+  int       end;          /* individuals of the current working thread  */ 
+  int       improovs;     /* improovs of the current thread             */
+  void      *const opt;   /* opts for the current thread                */
 } EvThreadArgs;
 
 /**
@@ -349,6 +350,8 @@ typedef struct {
  * |                                    |                                     |
  * | int min_quicksort                  | min array length to change from     |
  * |                                    | quick to insertion sort             |
+ * |                                    |                                     |
+ * | rand128_t **rands                  | array of random values              |
  * |                                    |                                     |
  * | int overall_start                  | indicates where to start repleacing |
  * |                                    | individuals during parallel         |
@@ -412,6 +415,7 @@ struct Evolution {
   const int      min_quicksort;              
   void *const    *const opts;   
   const int      num_threads; 
+  rand128_t      **rands;
   int            overall_start;
   int            overall_end; 
   const uint32_t i_mut_propability;
