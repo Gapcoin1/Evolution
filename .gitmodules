@@ -1,0 +1,3 @@
+[submodule "src/C-Utils"]
+	path = src/C-Utils
+	url = https://github.com/j0nn9/C-Utils.git
