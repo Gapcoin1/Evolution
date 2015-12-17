@@ -29,9 +29,9 @@ char tsp_continue_ev(Evolution *const ev);
 int main(int argc, char *argv[]) {
   
   /* cmd args check */
-  if (argc != 6) {
+  if (argc != 7) {
     printf("%s <num citys> <generation limit> <num ivs> "
-            "<num threads> <verbose(0-3)>\n", argv[0]);
+            "<num threads> <verbose(0-3)> <greedy>\n", argv[0]);
     exit(1);
   }
 
@@ -46,7 +46,9 @@ int main(int argc, char *argv[]) {
 
   int n_threads       = atoi(argv[4]);
   int n_ivs           = atoi(argv[3]);
+  int n_generations   = atoi(argv[2]);
   int n_citys         = atoi(argv[1]);
+  char greedy         = atoi(argv[6]);
   TSP *tsp            = new_tsp(n_citys);
   TSPEvolution **opts = malloc(sizeof(TSPEvolution *) * n_threads);
 
@@ -68,12 +70,18 @@ int main(int argc, char *argv[]) {
   args.recombinate          = recombinate_tsp_route;
   args.continue_ev          = tsp_continue_ev;
   args.population_size      = n_ivs;
-  args.generation_limit     = atoi(argv[2]);
+  args.generation_limit     = n_generations;
   args.mutation_propability = 0.1;
   args.death_percentage     = 0.5;
   args.opts                 = (void **) opts;
   args.num_threads          = n_threads;
   args.flags                = EV_UMUT|EV_AMUT|EV_ABRT|EV_KEEP|verbose;
+
+  if (greedy) {
+    args.greedy_individuals = n_ivs;
+    args.greedy_size = n_ivs / (n_threads * 2);
+    args.flags = EV_GRDY|EV_UMUT|EV_AMUT|verbose;
+  }
 
   Individual *best;
   Evolution *ev = new_evolution(&args);

@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
   best = best_evolution(&args);;
 
   #ifndef NO_OUTPUT
-  Vektor *v = (Vektor *) best->iv;
+  Vektor *v = (Vektor *) best.iv;
 
 
   printf("Best Vektor: (%3d, %3d, %3d, %3d, %3d, %3d) %10li\n\n", 
@@ -162,21 +162,8 @@ int main(int argc, char *argv[]) {
          v->d, 
          v->e, 
          v->f, 
-         best->fitness);
+         best.fitness);
 
-  for (i = 0; i < TEST_NUM_IVS; i++) {
-    best = ev->population[i];
-    v = (Vektor *) best->iv;
-
-    printf("(%3d, %3d, %3d, %3d, %3d, %3d) %10li\n", 
-           v->a, 
-           v->b, 
-           v->c, 
-           v->d,
-           v->e, 
-           v->f, 
-           best->fitness);
-  }
   #else
   (void) best;
   #endif

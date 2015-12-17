@@ -111,7 +111,6 @@ int main(int argc, char *argv[]) {
   args.mutate               = mutate_v;
   args.fitness              = fittnes_v;
   args.recombinate          = recombinate_v;
-  args.clone_iv             = NULL;
   args.population_size      = TEST_NUM_IVS;
   args.generation_limit     = atoi(argv[1]);
   args.mutation_propability = 1.0;

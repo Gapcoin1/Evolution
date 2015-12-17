@@ -50,6 +50,11 @@ static char ev_flags_invalid(uint64_t flags);
 static void *threadable_init_iv(void *arg);
 
 /**
+ * Parallel greedy init iv function
+ */
+static void *threadable_greedy_init_iv(void *arg);
+
+/**
  * Recombinates individual dunring an Generation change
  */
 static inline void ev_init_recombinate(Evolution *ev);
@@ -58,6 +63,12 @@ static inline void ev_init_recombinate(Evolution *ev);
  * Mutate all individuals if we don't use recombination
  */
 static inline void ev_init_mutate(Evolution *ev);
+
+/**
+ * in greedy mode we have on greedy best individual
+ * one generation best and one temporary individual
+ */
+static inline void ev_init_greedy(Evolution *ev);
 
 /**
  * switch old and new generation to discard the old one
@@ -72,6 +83,17 @@ static inline void ev_switch_ivs(Evolution *ev);
  * progressed generation
  */
 static inline void evolute_ivs(Evolution *ev);
+
+/**
+ * Wakeup the Threadabel functions
+ * an waits untill all work is done
+ * and count the improovs of the
+ * progressed generation
+ *
+ * set the best greedy individual as greedy individual
+ * for the next generation
+ */
+static inline void greedy_ivs(Evolution *ev);
 
 /**
  * Initializes the evolution process
@@ -104,14 +126,29 @@ static void *threadable_mutation_onely_1half(void *arg);
 static void *threadable_mutation_onely_rand(void *arg);
 
 /**
+ * Thread function to do greedy 
+ */
+static void *threadable_greedy(void *arg);
+
+/**
  * Initializes Thread Clients and Individuals serialized
  */
 static void ev_init_tc_and_ivs_serial(Evolution *ev);
 
 /**
+ * Initializes Thread Clients and Individuals serialized
+ */
+static void ev_init_tc_and_ivs_greedy_serial(Evolution *ev);
+
+/**
  * progress on generation on the ivs
  */
 static inline void evolute_ivs_seriel(Evolution *ev);
+
+/**
+ * progress on generation on the ivs
+ */
+static inline void greedy_ivs_seriel(Evolution *ev);
 
 /**
  * Parallel recombinate
@@ -216,6 +253,29 @@ static inline char ev_equal(Individual *a, Individual *b) {
 
 /**
  * Prints status information during 
+ * threadable greedy
+ */
+#define EV_IV_GREEDY_STATUS_OUTPUT(EV, INDEX)                                 \
+  do {                                                                        \
+      pthread_mutex_lock(&ev_mutex);                                          \
+      printf("Evolution: generation left %10d "                               \
+             "tasks greedy %10d improovs %10.d\r",                            \
+             (EV).generation_limit - (EV).info.generations_progressed,        \
+             (EV).greedy_size - INDEX,                                        \
+             (EV).info.improovs);                                             \
+      pthread_mutex_unlock(&ev_mutex);                                        \
+  } while (0)
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
+/**
+ * Prints status information during 
  * threadable recombination and mutation TODO make seperate output vor recombination mut_1/2
  */
 #define EV_IV_STATUS_OUTPUT_SERIEL(EV, INDEX)                                 \
@@ -232,10 +292,40 @@ static inline char ev_equal(Individual *a, Individual *b) {
  * main elvoute function
  */
 #define EV_EVOLUTE_OUTPUT(EV)                                                 \
-    printf("\33[2K\rimproovs: %10d -> %15.5f%%  best fitness: %10li\n",       \
+do {                                                                          \
+  if ((EV).info.improovs) {                                                   \
+    printf("\33[2K\rimproovs: " ANSI_COLOR_GREEN "%10d" ANSI_COLOR_RESET      \
+           " -> %15.5f%%  best fitness: %10li\n",                             \
            (EV).info.improovs,                                                \
            (((EV).info.improovs / (double) (EV).deaths) * 100.0),             \
-           (EV).population[0]->fitness)
+           (EV).population[0]->fitness);                                      \
+  } else {                                                                    \
+    printf("\33[2K\rimproovs: " ANSI_COLOR_RED "%10d" ANSI_COLOR_RESET        \
+           " -> %15.5f%%  best fitness: %10li\n",                             \
+           (EV).info.improovs,                                                \
+           (((EV).info.improovs / (double) (EV).deaths) * 100.0),             \
+           (EV).population[0]->fitness);                                      \
+  }                                                                           \
+} while (0)
+
+/**
+ * Prints status info during
+ * main elvoute function (greedy version)
+ */
+#define EV_GREEDY_OUTPUT(EV)                                                  \
+do {                                                                          \
+  if ((EV).info.improovs) {                                                   \
+    printf("\33[2K\rimproovs: " ANSI_COLOR_GREEN "%10d" ANSI_COLOR_RESET      \
+           " -> best fitness: %10li\n",                                       \
+           (EV).info.improovs,                                                \
+           (EV).population[0]->fitness);                                      \
+  } else {                                                                    \
+    printf("\33[2K\rimproovs: " ANSI_COLOR_RED "%10d" ANSI_COLOR_RESET        \
+           " -> best fitness: %10li\n",                                       \
+           (EV).info.improovs,                                                \
+           (EV).population[0]->fitness);                                      \
+  }                                                                           \
+} while (0)
 
 #define EV_THREAD_SAVE_NEW_LINE                                               \
   do {                                                                        \
@@ -289,6 +379,11 @@ Evolution *new_evolution(EvInitArgs *args) {
   if (!valid_args(args))
     return NULL;
 
+  /* in greedy mode we have on greedy best individual
+   * one generation best and one temporary individual */
+  if (args->flags & EV_GRDY)
+    args->population_size = 3 * args->num_threads;
+
   /* create new Evolution */
   Evolution *ev = (Evolution *) malloc(sizeof(Evolution));
 
@@ -303,12 +398,14 @@ Evolution *new_evolution(EvInitArgs *args) {
    * we can't recombinate in place
    */
   int mul = (args->flags & EV_KEEP) ? 1 : 2;
+  mul = (args->flags & EV_GRDY) ? 1 : mul;
 
   size_t population_space  = sizeof(Individual *); 
   size_t ivs_space         = sizeof(Individual); 
 
   population_space         *= args->population_size * mul;
   ivs_space                *= args->population_size * mul;
+  
                            
   ev->population           = (Individual **) malloc(population_space);
   ev->ivs                  = (Individual *) malloc(ivs_space);
@@ -331,6 +428,8 @@ Evolution *new_evolution(EvInitArgs *args) {
   }
 
   INIT_C_INT(ev->population_size,       args->population_size);
+  INIT_C_INT(ev->greedy_size,           args->greedy_size);
+  INIT_C_INT(ev->greedy_individuals,    args->greedy_individuals);
   INIT_C_INT(ev->generation_limit,      args->generation_limit);
   INIT_C_DBL(ev->mutation_propability,  args->mutation_propability);
   INIT_C_DBL(ev->death_percentage,      args->death_percentage);
@@ -345,6 +444,7 @@ Evolution *new_evolution(EvInitArgs *args) {
   INIT_C_CHR(ev->always_mutate,         args->flags & EV_AMUT);
   INIT_C_CHR(ev->keep_last_generation,  args->flags & EV_KEEP);
   INIT_C_CHR(ev->use_abort_requirement, args->flags & EV_ABRT);
+  INIT_C_CHR(ev->use_greedy,            args->flags & EV_GRDY);
   INIT_C_CHR(ev->sort_max,              args->flags & EV_SMAX);
   INIT_C_U16(ev->verbose,               args->flags & (EV_VEB1 |
                                                        EV_VEB2 |
@@ -363,6 +463,8 @@ Evolution *new_evolution(EvInitArgs *args) {
    */
   if (args->num_threads > 1)
     ev_init_tc_and_ivs(ev);
+  else if (ev->use_greedy)
+    ev_init_tc_and_ivs_greedy_serial(ev);
   else
     ev_init_tc_and_ivs_serial(ev);
 
@@ -387,6 +489,7 @@ static void ev_init_tc_and_ivs(Evolution *ev) {
    * we can't recombinate in place
    */
   int mul = ev->keep_last_generation ? 1 : 2;
+  mul = (ev->use_greedy ? 1 : mul);
 
   /* start and end of calculation */
   ev->overall_start = 0;
@@ -397,6 +500,11 @@ static void ev_init_tc_and_ivs(Evolution *ev) {
    */
   uint32_t ivs_per_thread = (ev->overall_end - ev->overall_start) /
                             ev->num_threads + 1;
+
+  /* in greedy mode we have on greedy best individual
+   * one generation best and one temporary individual */
+  if (ev->use_greedy)
+    ivs_per_thread = 3;
 
   /* add work for the clients */
   for (i = 0; i < ev->num_threads; i++) {
@@ -419,20 +527,23 @@ static void ev_init_tc_and_ivs(Evolution *ev) {
       ev->thread_args[i]->start = ev->overall_end;
 
     tc_add_func(&ev->thread_clients[i], 
-                threadable_init_iv, 
+                (ev->use_greedy ? threadable_greedy_init_iv : 
+                                  threadable_init_iv), 
                 (void *) ev->thread_args[i]);
   }
 
-  /* wait for threads */
+  /* wait for threads and collect improovs */
   for (i = 0; i < ev->num_threads; i++) {
     tc_join(&ev->thread_clients[i]);
+    ev->info.improovs += ev->thread_args[i]->improovs;
   }
 
   /**
    * Select the best individual to survive,
    * Sort the Individuals by their fittnes
    */
-  EV_SELECTION(ev); 
+  if (!ev->use_greedy)
+    EV_SELECTION(ev); 
 
   if (ev->verbose >= EV_VERBOSE_HIGH)
     printf("Population Initialized\n");
@@ -483,6 +594,17 @@ static char valid_args(EvInitArgs *args) {
     return 0;
   }
 
+  if (args->flags & EV_GRDY            && (
+       args->greedy_size         <=  0 ||
+       args->greedy_individuals  <=  0)) {
+
+    DBG_MSG("wrong opts");
+    return 0;
+  }
+
+  if (args->opts == NULL)
+    args->opts = (void**) malloc(sizeof(void *) * args->num_threads);
+
   return 1;
 }
 
@@ -501,22 +623,24 @@ static char ev_flags_invalid(uint64_t flags) {
   tflags &= ~EV_VEB2;
   tflags &= ~EV_VEB3;
   
-  return tflags != EV_UREC                           &&
-         tflags != (EV_UREC|EV_UMUT)                 &&
-         tflags != (EV_UMUT|EV_AMUT)                 &&
-         tflags != (EV_UREC|EV_UMUT|EV_AMUT)         &&
-         tflags != (EV_UREC|EV_KEEP)                 &&
-         tflags != (EV_UREC|EV_UMUT|EV_KEEP)         &&
-         tflags != (EV_UMUT|EV_AMUT|EV_KEEP)         &&
-         tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP) &&
-         tflags != (EV_UREC|EV_ABRT)                 &&
-         tflags != (EV_UREC|EV_UMUT|EV_ABRT)         &&
-         tflags != (EV_UMUT|EV_AMUT|EV_ABRT)         &&
-         tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT) &&
-         tflags != (EV_UREC|EV_KEEP|EV_ABRT)         &&
-         tflags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT) &&
-         tflags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT) &&
-         tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT);
+  return tflags != EV_UREC                                   &&
+         tflags != (EV_UREC|EV_UMUT)                         &&
+         tflags != (EV_UMUT|EV_AMUT)                         &&
+         tflags != (EV_UREC|EV_UMUT|EV_AMUT)                 &&
+         tflags != (EV_UREC|EV_KEEP)                         &&
+         tflags != (EV_UREC|EV_UMUT|EV_KEEP)                 &&
+         tflags != (EV_UMUT|EV_AMUT|EV_KEEP)                 &&
+         tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP)         &&
+         tflags != (EV_UREC|EV_ABRT)                         &&
+         tflags != (EV_UREC|EV_UMUT|EV_ABRT)                 &&
+         tflags != (EV_UMUT|EV_AMUT|EV_ABRT)                 &&
+         tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_ABRT)         &&
+         tflags != (EV_UREC|EV_KEEP|EV_ABRT)                 &&
+         tflags != (EV_UREC|EV_UMUT|EV_KEEP|EV_ABRT)         &&
+         tflags != (EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT)         &&
+         tflags != (EV_UREC|EV_UMUT|EV_AMUT|EV_KEEP|EV_ABRT) &&
+         tflags != (EV_GRDY|EV_UMUT|EV_AMUT)                 && 
+         tflags != (EV_GRDY|EV_UMUT|EV_AMUT|EV_ABRT);
 
 }
 
@@ -528,6 +652,7 @@ void evolution_clean_up(Evolution *ev) {
 
   int end = ev->keep_last_generation ? ev->population_size : 
                                        ev->population_size * 2; 
+  end = (ev->use_greedy ? end / 2 : end);
   int i;
 
   /**
@@ -601,6 +726,69 @@ static void *threadable_init_iv(void *arg) {
         EV_THREAD_SAVE_NEW_LINE;
     }
   }
+
+  return NULL;
+}
+
+/**
+ * Parallel greedy init iv function
+ */
+static void *threadable_greedy_init_iv(void *arg) {
+
+  EvThreadArgs *evt = arg;
+  Evolution *ev     = evt->ev;
+  int i, start = evt->start;
+
+  /**
+   * create new individual
+   */
+  for (i = 0; i < 3; i++) {
+    ev->population[start + i]  = ev->ivs + start + i;
+    ev->ivs[start + i].iv      = ev->init_iv(evt->opt);
+    ev->ivs[start + i].fitness = ev->fitness(&ev->ivs[start + i], evt->opt);  
+  }
+
+  /**
+   * generate random individuals and choose the best 
+   */
+  for (i = 0; i < ev->greedy_individuals; i++) {
+     
+    /**
+     * create new individual
+     */
+    ev->free_iv(ev->ivs[start + 1].iv, evt->opt);
+    ev->ivs[start + 1].iv      = ev->init_iv(evt->opt);
+    ev->ivs[start + 1].fitness = ev->fitness(&ev->ivs[start + 1], evt->opt);  
+
+    /* set best individual if neccesary */
+    if (ev->sort_max) {
+      if (ev->ivs[start].fitness < ev->ivs[start + 1].fitness) {
+        ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, *ev->opts);
+        ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
+        evt->improovs++;
+      }
+    } else {
+      if (ev->ivs[start].fitness > ev->ivs[start + 1].fitness) {
+        ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, *ev->opts);
+        ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
+        evt->improovs++;
+      }
+    }
+
+    /**
+     * prints status informations if wanted
+     */
+    if (ev->verbose >= EV_VERBOSE_ONELINE) {
+      EV_INIT_IV_OUTPUT(i);
+
+      if (ev->verbose >= EV_VERBOSE_HIGH)
+        EV_THREAD_SAVE_NEW_LINE;
+    }
+  }
+
+  /* copy best individual */
+  ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start].iv, *ev->opts);
+  ev->ivs[start + 1].fitness = ev->ivs[start].fitness;
 
   return NULL;
 }
@@ -725,6 +913,48 @@ static inline void ev_init_mutate(Evolution *ev) {
 }
 
 /**
+ * in greedy mode we have on greedy best individual
+ * one generation best and one temporary individual
+ */
+static inline void ev_init_greedy(Evolution *ev) {
+
+  int j;
+
+  ev->overall_start = 0;
+  ev->overall_end   = ev->population_size;
+  
+  /* break if we using serial version */
+  if (ev->num_threads <= 1) return;
+
+  /**
+   * number of individuals calculated by one thread
+   */
+  uint32_t ivs_per_thread = 3; 
+
+  /* setting start and end areas for each thread */
+  for (j = 0; j < ev->num_threads; j++) {
+
+    ev->thread_args[j]->start = ev->overall_start + j * ivs_per_thread;
+    ev->thread_args[j]->end   = ev->thread_args[j]->start + ivs_per_thread;
+
+    if (ev->thread_args[j]->end > ev->overall_end)
+      ev->thread_args[j]->end = ev->overall_end;
+
+    if (ev->thread_args[j]->start > ev->overall_end)
+      ev->thread_args[j]->start = ev->overall_end;
+  }
+     
+  /* start parallel working */
+  for (j = 0; j < ev->num_threads; j++) {
+
+    tc_set_rerun_func(&ev->thread_clients[j], 
+                      threadable_greedy,
+                      (void *) ev->thread_args[j]);
+  }
+}
+
+
+/**
  * switch old and new generation to discard the old one
  * which will be overidden at the next generation change
  */
@@ -774,6 +1004,67 @@ static inline void evolute_ivs(Evolution *ev) {
 }
 
 /**
+ * Wakeup the Threadabel functions
+ * an waits untill all work is done
+ * and count the improovs of the
+ * progressed generation
+ *
+ * set the best greedy individual as greedy individual
+ * for the next generation
+ */
+static inline void greedy_ivs(Evolution *ev) {
+  
+  int j;
+  int64_t best_fitness = ev->ivs[0].fitness;
+  int best_index  = 0;
+
+  /**
+   * wakeup all threads
+   */
+  for (j = 0; j < ev->num_threads; j++) 
+    tc_rerun(&ev->thread_clients[j]);
+
+  /**
+   * Wait untill all threads are finished
+   */
+  for (j = 0; j < ev->num_threads; j++) 
+    tc_join(&ev->thread_clients[j]);
+
+  /**
+   * resets, count improovs
+   * of the finished threads
+   */
+  ev->info.improovs = 0;
+
+  for (j = 0; j < ev->num_threads; j++)
+    ev->info.improovs += ev->thread_args[j]->improovs;
+
+  /* find the best greedy individual */
+  for (j = 1; j < ev->num_threads; j++) {
+    
+    if (ev->sort_max) {
+      if (ev->ivs[j * 3].fitness > best_fitness) {
+        best_fitness = ev->ivs[j * 3].fitness;
+        best_index   = j * 3;
+      } 
+    } else {
+      if (ev->ivs[j * 3].fitness < best_fitness) {
+        best_fitness = ev->ivs[j * 3].fitness;
+        best_index   = j * 3;
+      } 
+    }
+  }
+  
+  /* copy the best individual to all other threads */
+  for (j = 0; j < ev->num_threads; j++) {
+    if (j * 3 != best_index) {
+      ev->clone_iv(ev->ivs[j * 3].iv, ev->ivs[best_index].iv, ev->opts[j]);
+      ev->ivs[j + 3].fitness = ev->ivs[best_index].fitness;
+    }
+  }
+}
+
+/**
  * Initializes the evolution process
  * by configurating and starting the threads
  * and choosing what to be done
@@ -784,7 +1075,9 @@ static inline void init_evolute(Evolution *ev) {
    * init recombinatin or mutatation
    * depeding on given flags in init
    */
-  if (ev->use_recombination)
+  if (ev->use_greedy)
+    ev_init_greedy(ev);
+  else if (ev->use_recombination)
     ev_init_recombinate(ev);
   else 
     ev_init_mutate(ev);
@@ -835,23 +1128,31 @@ Individual *evolute(Evolution *ev) {
      * recombinates or mutates individuals
      * depeding on given flags in init
      */
-    if (ev->num_threads > 1)
-      evolute_ivs(ev);
-    else 
-      evolute_ivs_seriel(ev);
+    if (ev->num_threads > 1) {
+      if (ev->use_greedy)
+        greedy_ivs(ev);
+      else
+        evolute_ivs(ev);
+    } else {
+      if (ev->use_greedy)
+        greedy_ivs_seriel(ev);
+      else
+        evolute_ivs_seriel(ev);
+    }
   
     /**
      * switch old and new generation to discard the old one
      * which will be overidden next time
      */
-    if (!ev->keep_last_generation)
+    if (!ev->keep_last_generation && !ev->use_greedy)
       ev_switch_ivs(ev);
 
     /**
      * Select the best individuals to survindividuale,
      * Sort the Individuals by theur fittnes
      */
-    EV_SELECTION(ev);
+    if (!ev->use_greedy)
+      EV_SELECTION(ev);
 
     /* update progressed generations */
     ev->info.generations_progressed = i + 1;
@@ -859,7 +1160,9 @@ Individual *evolute(Evolution *ev) {
     /**
      * print status informations if wanted
      */
-    if (ev->verbose >= EV_VERBOSE_HIGH)
+    if (ev->verbose >= EV_VERBOSE_HIGH && ev->use_greedy)
+      EV_GREEDY_OUTPUT(*ev);
+    else if (ev->verbose >= EV_VERBOSE_HIGH)
       EV_EVOLUTE_OUTPUT(*ev);
   }
 
@@ -1087,6 +1390,71 @@ static void *threadable_mutation_onely_rand(void *arg) {
 }
 
 /**
+ * Thread function to do greedy 
+ */
+static void *threadable_greedy(void *arg) {
+
+  EvThreadArgs *evt = arg;
+  Evolution *ev = evt->ev;
+  int j, start = evt->start;
+
+  /* reset threadwide iprooves */
+  evt->improovs = 0;  
+ 
+  /* initialize generation best to greedy best */
+  ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start + 0].iv, evt->opt);
+
+  for (j = 0; j < ev->greedy_size; j++) {
+
+    /* copy greedy best and mutate it */
+    ev->clone_iv(ev->ivs[start + 2].iv, ev->ivs[start + 0].iv, evt->opt);
+    ev->mutate(&ev->ivs[start + 2], evt->opt);
+
+    /* calculate fitness and set generation best if neccesary */
+    ev->ivs[start + 2].fitness = ev->fitness(&ev->ivs[start + 2], evt->opt);
+    
+    if (ev->sort_max) {
+      if (ev->ivs[start + 1].fitness < ev->ivs[start + 2].fitness) {
+        ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start + 2].iv, evt->opt);
+        ev->ivs[start + 1].fitness = ev->ivs[start + 2].fitness;
+        evt->improovs++;
+      }
+    } else {
+      if (ev->ivs[start + 1].fitness > ev->ivs[start + 2].fitness) {
+        ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start + 2].iv, evt->opt);
+        ev->ivs[start + 1].fitness = ev->ivs[start + 2].fitness;
+        evt->improovs++;
+      }
+    }
+
+    /**
+     * print status informations if wanted
+     */
+    if (ev->verbose >= EV_VERBOSE_ONELINE) {
+      EV_IV_GREEDY_STATUS_OUTPUT(*ev, j);
+
+      if (ev->verbose >= EV_VERBOSE_ULTRA)
+        EV_THREAD_SAVE_NEW_LINE;
+    }
+  }
+
+  /* set greedy best if generation best is better */
+  if (ev->sort_max) {
+    if (ev->ivs[start].fitness < ev->ivs[start + 1].fitness) {
+      ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, evt->opt);
+      ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
+    }
+  } else {
+    if (ev->ivs[start].fitness > ev->ivs[start + 1].fitness) {
+      ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, evt->opt);
+      ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
+    }
+  }
+
+  return NULL;
+}
+
+/**
  * returns the Size an Evolution with the given args will have
  */
 uint64_t ev_size(int population_size, 
@@ -1122,6 +1490,7 @@ static void ev_init_tc_and_ivs_serial(Evolution *ev) {
    * we can't recombinate in place
    */
   int mul = ev->keep_last_generation ? 1 : 2;
+  mul = (ev->use_greedy ? 1 : mul);
 
   /* start and end of calculation */
   ev->overall_start = 0;
@@ -1155,7 +1524,75 @@ static void ev_init_tc_and_ivs_serial(Evolution *ev) {
    * Select the best individual to survive,
    * Sort the Individuals by their fittnes
    */
-  EV_SELECTION(ev); 
+  if (!ev->use_greedy)
+    EV_SELECTION(ev); 
+
+  if (ev->verbose >= EV_VERBOSE_HIGH)
+    printf("Population Initialized\n");
+
+}
+
+/**
+ * Initializes Thread Clients and Individuals serialized
+ */
+static void ev_init_tc_and_ivs_greedy_serial(Evolution *ev) {
+ 
+  int i;
+
+  /* start and end of calculation */
+  ev->overall_start = 0;
+  ev->overall_end   = ev->population_size;
+
+  /**
+   * create new individual s
+   */
+  for (i = 0; i < 3; i++) {
+    ev->population[i]  = ev->ivs + i;
+    ev->ivs[i].iv      = ev->init_iv(*ev->opts);
+    ev->ivs[i].fitness = ev->fitness(&ev->ivs[i], *ev->opts);  
+  }
+
+  /**
+   * generate random individuals and choose the best 
+   */
+  for (i = 0; i < ev->greedy_individuals; i++) {
+     
+    /**
+     * create new individual
+     */
+    ev->free_iv(ev->population[1], *ev->opts);
+    ev->ivs[1].iv      = ev->init_iv(*ev->opts);
+    ev->ivs[1].fitness = ev->fitness(&ev->ivs[1], *ev->opts);  
+
+    /* set best individual if neccesary */
+    if (ev->sort_max) {
+      if (ev->ivs[0].fitness < ev->ivs[1].fitness) {
+        ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
+        ev->ivs[0].fitness = ev->ivs[1].fitness;
+        ev->info.improovs++;
+      }
+    } else {
+      if (ev->ivs[0].fitness > ev->ivs[1].fitness) {
+        ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
+        ev->ivs[0].fitness = ev->ivs[1].fitness;
+        ev->info.improovs++;
+      }
+    }
+
+    /**
+     * prints status informations if wanted
+     */
+    if (ev->verbose >= EV_VERBOSE_ONELINE) {
+      EV_INIT_IV_OUTPUT(i);
+
+      if (ev->verbose >= EV_VERBOSE_HIGH)
+        EV_THREAD_SAVE_NEW_LINE;
+    }
+  }
+
+  /* copy best individual */
+  ev->clone_iv(ev->ivs[1].iv, ev->ivs[0].iv, *ev->opts);
+  ev->ivs[1].fitness = ev->ivs[0].fitness;
 
   if (ev->verbose >= EV_VERBOSE_HIGH)
     printf("Population Initialized\n");
@@ -1178,7 +1615,59 @@ static inline void evolute_ivs_seriel(Evolution *ev) {
 }
 
 /**
- * Parallel recombinate
+ * progress on generation on the ivs
+ */
+static inline void greedy_ivs_seriel(Evolution *ev) {
+  
+  
+  int j;
+
+  /* reset improovs */
+  ev->info.improovs = 0;
+
+  /* initialize generation best to greedy best */
+  ev->clone_iv(ev->ivs[1].iv, ev->ivs[0].iv, *ev->opts);
+
+  for (j = 0; j < ev->greedy_size; j++) {
+
+    /* copy greedy best and mutate it */
+    ev->clone_iv(ev->ivs[2].iv, ev->ivs[0].iv, *ev->opts);
+    ev->mutate(&ev->ivs[2], *ev->opts);
+
+    /* calculate fitness and set generation best if neccesary */
+    ev->ivs[2].fitness = ev->fitness(&ev->ivs[2], *ev->opts);
+    
+    if (ev->sort_max) {
+      if (ev->ivs[1].fitness < ev->ivs[2].fitness) {
+        ev->clone_iv(ev->ivs[1].iv, ev->ivs[2].iv, *ev->opts);
+        ev->ivs[1].fitness = ev->ivs[2].fitness;
+        ev->info.improovs++;
+      }
+    } else {
+      if (ev->ivs[1].fitness > ev->ivs[2].fitness) {
+        ev->clone_iv(ev->ivs[1].iv, ev->ivs[2].iv, *ev->opts);
+        ev->ivs[1].fitness = ev->ivs[2].fitness;
+        ev->info.improovs++;
+      }
+    }
+  }
+
+  /* set greedy best if generation best is better */
+  if (ev->sort_max) {
+    if (ev->ivs[0].fitness < ev->ivs[1].fitness) {
+      ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
+      ev->ivs[0].fitness = ev->ivs[1].fitness;
+    }
+  } else {
+    if (ev->ivs[0].fitness > ev->ivs[1].fitness) {
+      ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
+      ev->ivs[0].fitness = ev->ivs[1].fitness;
+    }
+  }
+}
+
+/**
+ * seriel recombinate
  */
 static void seriel_recombinate(Evolution *ev) {
 
@@ -1192,7 +1681,7 @@ static void seriel_recombinate(Evolution *ev) {
     ERR_MSG("less than 2 individuals in recombinate");
   #endif
 
-  /* reset improoves */
+  /* reset improovs */
   ev->info.improovs = 0;  
 
   /**
@@ -1393,6 +1882,7 @@ void ev_inspect(Evolution *ev) {
          "always_mutate:         %d\n\t"
          "keep_last_generation:  %d\n\t"
          "use_abort_requirement: %d\n\t"
+         "use_greedy:            %d\n\t"
          "deaths:                %d\n\t"
          "survivors:             %d\n\t"
          "sort_max:              %d\n\t"
@@ -1411,6 +1901,7 @@ void ev_inspect(Evolution *ev) {
          ev->always_mutate,
          ev->keep_last_generation,
          ev->use_abort_requirement,
+         ev->use_greedy,
          ev->deaths,
          ev->survivors,
          ev->sort_max,

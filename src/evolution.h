@@ -63,6 +63,7 @@ typedef struct Evolution Evolution;
 #define EV_VERBOSE_ONELINE        256
 #define EV_VERBOSE_HIGH           512
 #define EV_VERBOSE_ULTRA          768
+#define EV_USE_GREEDY             64
 
 /**
  * Shorter Flags
@@ -78,6 +79,7 @@ typedef struct Evolution Evolution;
 #define EV_VEB1 EV_VERBOSE_ONELINE
 #define EV_VEB2 EV_VERBOSE_HIGH
 #define EV_VEB3 EV_VERBOSE_ULTRA
+#define EV_GRDY EV_USE_GREEDY
 
 /**
  * Structur holding aditional information during an evolution
@@ -118,8 +120,8 @@ typedef struct {
  * |                                    | new initialized individual          |
  * |                                    |                                     |
  * | void clone_iv(void *dst,           | takes 2 void pointer to individuals |
- * |                       void *src,   | and should clone the content of the |
- * |                       void *opts)  | second one into the first one       |
+ * |               void *src,           | and should clone the content of the |
+ * |               void *opts)          | second one into the first one       |
  * |                                    |                                     |
  * | void free_iv(void *src,            | takes an void ptr to an individual  |
  * |              void *opts)           | and should free the spaces          |
@@ -131,7 +133,7 @@ typedef struct {
  * |                                    | improove it is around 1/5           |
  * |                                    |                                     |
  * | int64_t fitness(Individual *src,   | takes an void pointer to an         |
- * |             void *opts)            | individual, and should return an    |
+ * |                 void *opts)        | individual, and should return an    |
  * |                                    | integer value that indicates how    |
  * |                                    | strong (good / improoved / near by  |
  * |                                    | an optimal solution) it is. Control |
@@ -154,6 +156,13 @@ typedef struct {
  * |                                    | Evolution population (the real      |
  * |                                    | number of Individuals hold in       |
  * |                                    | memory can be differ)               |
+ * |                                    |                                     |
+ * | int greedy_size                    | the population size for each thread |
+ * |                                    | in greedy mode (greedy runs)        |
+ * |                                    |                                     |
+ * | int greedy_individuals             | the number of new individuals       |
+ * |                                    | created by each thread in order to  |
+ * |                                    | find the best starting individual   |
  * |                                    |                                     |
  * | double generation_limit            | the maximum amoung of generation to |
  * |                                    | calculate                           |
@@ -280,6 +289,13 @@ typedef struct {
  * | EV_UREC                         | Recombinate Individual onley disgard   |
  * |                                 | old generation and calc until          |
  * |                                 | generation limit is reatched           |
+ * |                                 |                                        |
+ * | EV_GRDY                         | run in greedy mode (mutates and / or   |
+ * |                                 | recombinates(the best with a new) the  |
+ * |                                 | individuals in each generation, takes  |
+ * |                                 | best individual, kill all other and    |
+ * |                                 | recreate the population by cloning the |
+ * |                                 | best individual)                       |
  * +---------------------------------+----------------------------------------+
  */
 typedef struct {
@@ -294,6 +310,8 @@ typedef struct {
                            void *);
   char     (*continue_ev) (Evolution *const);
   int      population_size;
+  int      greedy_size;
+  int      greedy_individuals;
   int      generation_limit;
   double   mutation_propability;
   double   death_percentage;
@@ -411,6 +429,8 @@ struct Evolution {
                                         Individual *, 
                                         void *);
   const int      population_size;
+        int      greedy_size; /* changeable within continue_ev */
+  const int      greedy_individuals;
   const int      generation_limit;
   const double   mutation_propability;
   const double   death_percentage;
@@ -419,6 +439,7 @@ struct Evolution {
   const char     always_mutate;                  
   const char     keep_last_generation;           
   const char     use_abort_requirement;          
+  const char     use_greedy;          
   const int      deaths;
   const int      survivors;
   const char     sort_max;                     

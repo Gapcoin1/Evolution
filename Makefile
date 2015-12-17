@@ -2,7 +2,7 @@ VERSION = 1.0.0
 BIN   							= ./bin
 CC									= gcc
 CFLAGS							= -Wall -Wextra -Werror -c -Winline 
-LDFLAGS							= -lm -lpthread
+LDFLAGS							= -lm -pthread
 OTFLAGS 						= -march=native
 DBFLAGS							= -g -D DEBUG
 LIB									= src/C-Utils
@@ -107,7 +107,7 @@ tsp-test-O3: evolution-O3
 test-only-mutate: evolution
 	@echo "Make test-only-mutate"
 	$(CC) $(CFLAGS) test/test-only-mutate.c -o test/test-only-mutate.o
-	$(CC) $(LDFLAGS) src/evolution.o $(SORT_OBJ) test/test-only-mutate.o 			\
+	$(CC) $(LDFLAGS) src/evolution.o test/test-only-mutate.o 			\
 				-o $(BIN)/test-only-mutate
 
 test-only-mutate-O2: evolution-O2
