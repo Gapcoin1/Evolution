@@ -188,7 +188,7 @@ static inline char ev_equal(Individual *a, Individual *b) {
  * at the given possition in the given Evolution
  * with the given opts
  */
-#define EV_FITNESS_AT(EV, I) (EV).population[I]->fitness 
+#define EV_FITNESS_AT(EV, I) (EV)->population[I]->fitness 
 
 /**
  * Calculates the fittnes of the individual
@@ -196,7 +196,7 @@ static inline char ev_equal(Individual *a, Individual *b) {
  * with the given opts
  */
 #define EV_CALC_FITNESS_AT(EV, I, OPTS)                                       \
-    (EV).population[I]->fitness = (EV).fitness((EV).population[I], OPTS)
+  (EV)->population[I]->fitness = (EV)->fitness((EV)->population[I], OPTS)
 
 /**
  * Macro for sorting the Evolution by fittnes 
@@ -224,6 +224,29 @@ static inline char ev_equal(Individual *a, Individual *b) {
                             (EV)->min_quicksort);             \
     }                                                         \
   } while (0)
+
+/* macro to copy one individual to an other if it is better */
+#define EV_COPY_BETTER_IV(EV, ID_DST, ID_SRC, OPTS)               \
+do {                                                              \
+  if ((EV)->sort_max) {                                           \
+    if (EV_FITNESS_AT(EV, ID_DST) < EV_FITNESS_AT(EV, ID_SRC)) {  \
+      (EV)->clone_iv((EV)->population[ID_DST]->iv,                \
+                     (EV)->population[ID_SRC]->iv,                \
+                     OPTS);                                       \
+                                                                  \
+      EV_FITNESS_AT(EV, ID_DST) = EV_FITNESS_AT(EV, ID_SRC);      \
+    }                                                             \
+  } else {                                                        \
+    if (EV_FITNESS_AT(EV, ID_DST) > EV_FITNESS_AT(EV, ID_SRC)) {  \
+      (EV)->clone_iv((EV)->population[ID_DST]->iv,                \
+                     (EV)->population[ID_SRC]->iv,                \
+                     OPTS);                                       \
+                                                                  \
+      EV_FITNESS_AT(EV, ID_DST) = EV_FITNESS_AT(EV, ID_SRC);      \
+    }                                                             \
+  }                                                               \
+} while (0)
+
 
 /**
  * Prints status information during 
@@ -652,7 +675,7 @@ void evolution_clean_up(Evolution *ev) {
 
   int end = ev->keep_last_generation ? ev->population_size : 
                                        ev->population_size * 2; 
-  end = (ev->use_greedy ? end / 2 : end);
+  end = (ev->use_greedy ? ev->population_size : end);
   int i;
 
   /**
@@ -712,9 +735,9 @@ static void *threadable_init_iv(void *arg) {
     /**
      * create new individual
      */
-    ev->population[i]  = ev->ivs + i;
-    ev->ivs[i].iv      = ev->init_iv(evt->opt);
-    ev->ivs[i].fitness = ev->fitness(&ev->ivs[i], evt->opt);  
+    ev->population[i]     = ev->ivs + i;
+    ev->population[i]->iv = ev->init_iv(evt->opt);
+    EV_CALC_FITNESS_AT(ev, i, evt->opt);
 
     /**
      * prints status informations if wanted
@@ -743,9 +766,9 @@ static void *threadable_greedy_init_iv(void *arg) {
    * create new individual
    */
   for (i = 0; i < 3; i++) {
-    ev->population[start + i]  = ev->ivs + start + i;
-    ev->ivs[start + i].iv      = ev->init_iv(evt->opt);
-    ev->ivs[start + i].fitness = ev->fitness(&ev->ivs[start + i], evt->opt);  
+    ev->population[start + i]          = ev->ivs + start + i;
+    ev->population[start + i]->iv      = ev->init_iv(evt->opt);
+    EV_CALC_FITNESS_AT(ev, start + i, evt->opt);
   }
 
   /**
@@ -756,24 +779,12 @@ static void *threadable_greedy_init_iv(void *arg) {
     /**
      * create new individual
      */
-    ev->free_iv(ev->ivs[start + 1].iv, evt->opt);
-    ev->ivs[start + 1].iv      = ev->init_iv(evt->opt);
-    ev->ivs[start + 1].fitness = ev->fitness(&ev->ivs[start + 1], evt->opt);  
+    ev->free_iv(ev->population[start + 1]->iv, evt->opt);
+    ev->population[start + 1]->iv = ev->init_iv(evt->opt);
+    EV_CALC_FITNESS_AT(ev, start + 1, evt->opt);
 
     /* set best individual if neccesary */
-    if (ev->sort_max) {
-      if (ev->ivs[start].fitness < ev->ivs[start + 1].fitness) {
-        ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, *ev->opts);
-        ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
-        evt->improovs++;
-      }
-    } else {
-      if (ev->ivs[start].fitness > ev->ivs[start + 1].fitness) {
-        ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, *ev->opts);
-        ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
-        evt->improovs++;
-      }
-    }
+    EV_COPY_BETTER_IV(ev, start, start + 1, evt->opt);
 
     /**
      * prints status informations if wanted
@@ -785,10 +796,6 @@ static void *threadable_greedy_init_iv(void *arg) {
         EV_THREAD_SAVE_NEW_LINE;
     }
   }
-
-  /* copy best individual */
-  ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start].iv, *ev->opts);
-  ev->ivs[start + 1].fitness = ev->ivs[start].fitness;
 
   return NULL;
 }
@@ -1015,7 +1022,7 @@ static inline void evolute_ivs(Evolution *ev) {
 static inline void greedy_ivs(Evolution *ev) {
   
   int j;
-  int64_t best_fitness = ev->ivs[0].fitness;
+  int64_t best_fitness = ev->population[0]->fitness;
   int best_index  = 0;
 
   /**
@@ -1043,13 +1050,13 @@ static inline void greedy_ivs(Evolution *ev) {
   for (j = 1; j < ev->num_threads; j++) {
     
     if (ev->sort_max) {
-      if (ev->ivs[j * 3].fitness > best_fitness) {
-        best_fitness = ev->ivs[j * 3].fitness;
+      if (ev->population[j * 3]->fitness > best_fitness) {
+        best_fitness = ev->population[j * 3]->fitness;
         best_index   = j * 3;
       } 
     } else {
-      if (ev->ivs[j * 3].fitness < best_fitness) {
-        best_fitness = ev->ivs[j * 3].fitness;
+      if (ev->population[j * 3]->fitness < best_fitness) {
+        best_fitness = ev->population[j * 3]->fitness;
         best_index   = j * 3;
       } 
     }
@@ -1058,8 +1065,8 @@ static inline void greedy_ivs(Evolution *ev) {
   /* copy the best individual to all other threads */
   for (j = 0; j < ev->num_threads; j++) {
     if (j * 3 != best_index) {
-      ev->clone_iv(ev->ivs[j * 3].iv, ev->ivs[best_index].iv, ev->opts[j]);
-      ev->ivs[j + 3].fitness = ev->ivs[best_index].fitness;
+      ev->clone_iv(ev->population[j * 3]->iv, ev->population[best_index]->iv, ev->opts[j]);
+      ev->population[j + 3]->fitness = ev->population[best_index]->fitness;
     }
   }
 }
@@ -1114,6 +1121,12 @@ Individual *evolute(Evolution *ev) {
   init_evolute(ev);
 
   /**
+   * print status informations if wanted
+   */
+  if (ev->verbose >= EV_VERBOSE_HIGH && ev->use_greedy)
+    EV_GREEDY_OUTPUT(*ev);
+
+  /**
    * Generation loop
    * each loop lets one generation grow kills the worst individuals
    * and let new individuals born (depending on the previous given flags)
@@ -1164,12 +1177,12 @@ Individual *evolute(Evolution *ev) {
       EV_GREEDY_OUTPUT(*ev);
     else if (ev->verbose >= EV_VERBOSE_HIGH)
       EV_EVOLUTE_OUTPUT(*ev);
+
   }
 
   /* shutdown threads */
   close_evolute(ev);
 
-  /* return the best */
   return ev->population[0];
 }
 
@@ -1224,8 +1237,7 @@ static void *threadable_recombinate(void *arg) {
     }
 
     /* calculate the fittnes for the new individuals */
-    ev->population[j]->fitness = ev->fitness(ev->population[j], 
-                                             evt->opt);
+    EV_CALC_FITNESS_AT(ev, j, evt->opt);
 
     /**
      * store if the new individual is better as the old one
@@ -1290,21 +1302,21 @@ static void *threadable_mutation_onely_1half(void *arg) {
                evt->opt);
  
     /* calculate the fittnes for the new individual */
-    EV_CALC_FITNESS_AT(*ev, j, evt->opt);
+    EV_CALC_FITNESS_AT(ev, j, evt->opt);
     
     /**
      * store if the new individual is better as the old one
      */
     if (ev->sort_max) {
-      if (EV_FITNESS_AT(*ev, j) > 
-          EV_FITNESS_AT(*ev, j - ev->overall_start)) {
+      if (EV_FITNESS_AT(ev, j) > 
+          EV_FITNESS_AT(ev, j - ev->overall_start)) {
  
         evt->improovs++;
       }
  
     } else {
-      if (EV_FITNESS_AT(*ev, j) <
-          EV_FITNESS_AT(*ev, j - ev->overall_start)) {
+      if (EV_FITNESS_AT(ev, j) <
+          EV_FITNESS_AT(ev, j - ev->overall_start)) {
  
         evt->improovs++;
       }
@@ -1356,8 +1368,7 @@ static void *threadable_mutation_onely_rand(void *arg) {
     ev->mutate(ev->population[j], evt->opt);
  
     /* calculate the fittnes for the new individual */
-    ev->population[j]->fitness = ev->fitness(ev->population[j], 
-                                             evt->opt);
+    EV_CALC_FITNESS_AT(ev, j, evt->opt);
    
     /**
      * store if the new individual is better as the old one
@@ -1402,30 +1413,19 @@ static void *threadable_greedy(void *arg) {
   evt->improovs = 0;  
  
   /* initialize generation best to greedy best */
-  ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start + 0].iv, evt->opt);
+  ev->clone_iv(ev->population[start + 1]->iv, ev->population[start]->iv, evt->opt);
+  ev->population[start + 1]->fitness = ev->population[start]->fitness;
 
   for (j = 0; j < ev->greedy_size; j++) {
 
     /* copy greedy best and mutate it */
-    ev->clone_iv(ev->ivs[start + 2].iv, ev->ivs[start + 0].iv, evt->opt);
-    ev->mutate(&ev->ivs[start + 2], evt->opt);
+    ev->clone_iv(ev->population[start + 2]->iv, ev->population[start]->iv, evt->opt);
+    ev->mutate(ev->population[start + 2], evt->opt);
 
     /* calculate fitness and set generation best if neccesary */
-    ev->ivs[start + 2].fitness = ev->fitness(&ev->ivs[start + 2], evt->opt);
+    EV_CALC_FITNESS_AT(ev, start + 2, evt->opt);
     
-    if (ev->sort_max) {
-      if (ev->ivs[start + 1].fitness < ev->ivs[start + 2].fitness) {
-        ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start + 2].iv, evt->opt);
-        ev->ivs[start + 1].fitness = ev->ivs[start + 2].fitness;
-        evt->improovs++;
-      }
-    } else {
-      if (ev->ivs[start + 1].fitness > ev->ivs[start + 2].fitness) {
-        ev->clone_iv(ev->ivs[start + 1].iv, ev->ivs[start + 2].iv, evt->opt);
-        ev->ivs[start + 1].fitness = ev->ivs[start + 2].fitness;
-        evt->improovs++;
-      }
-    }
+    EV_COPY_BETTER_IV(ev, start + 1, start + 2, evt->opt);
 
     /**
      * print status informations if wanted
@@ -1439,17 +1439,7 @@ static void *threadable_greedy(void *arg) {
   }
 
   /* set greedy best if generation best is better */
-  if (ev->sort_max) {
-    if (ev->ivs[start].fitness < ev->ivs[start + 1].fitness) {
-      ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, evt->opt);
-      ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
-    }
-  } else {
-    if (ev->ivs[start].fitness > ev->ivs[start + 1].fitness) {
-      ev->clone_iv(ev->ivs[start].iv, ev->ivs[start + 1].iv, evt->opt);
-      ev->ivs[start].fitness = ev->ivs[start + 1].fitness;
-    }
-  }
+  EV_COPY_BETTER_IV(ev, start, start + 1, evt->opt);
 
   return NULL;
 }
@@ -1505,9 +1495,9 @@ static void ev_init_tc_and_ivs_serial(Evolution *ev) {
     /**
      * create new individual
      */
-    ev->population[i]  = ev->ivs + i;
-    ev->ivs[i].iv      = ev->init_iv(*ev->opts);
-    ev->ivs[i].fitness = ev->fitness(&ev->ivs[i], *ev->opts);  
+    ev->population[i]     = ev->ivs + i;
+    ev->population[i]->iv = ev->init_iv(*ev->opts);
+    EV_CALC_FITNESS_AT(ev, i, *ev->opts);
 
     /**
      * prints status informations if wanted
@@ -1547,9 +1537,9 @@ static void ev_init_tc_and_ivs_greedy_serial(Evolution *ev) {
    * create new individual s
    */
   for (i = 0; i < 3; i++) {
-    ev->population[i]  = ev->ivs + i;
-    ev->ivs[i].iv      = ev->init_iv(*ev->opts);
-    ev->ivs[i].fitness = ev->fitness(&ev->ivs[i], *ev->opts);  
+    ev->population[i]     = ev->ivs + i;
+    ev->population[i]->iv = ev->init_iv(*ev->opts);
+    EV_CALC_FITNESS_AT(ev, i, *ev->opts);
   }
 
   /**
@@ -1560,24 +1550,12 @@ static void ev_init_tc_and_ivs_greedy_serial(Evolution *ev) {
     /**
      * create new individual
      */
-    ev->free_iv(ev->population[1], *ev->opts);
-    ev->ivs[1].iv      = ev->init_iv(*ev->opts);
-    ev->ivs[1].fitness = ev->fitness(&ev->ivs[1], *ev->opts);  
+    ev->free_iv(ev->population[1]->iv, *ev->opts);
+    ev->population[1]->iv = ev->init_iv(*ev->opts);
+    EV_CALC_FITNESS_AT(ev, 1, *ev->opts);
 
     /* set best individual if neccesary */
-    if (ev->sort_max) {
-      if (ev->ivs[0].fitness < ev->ivs[1].fitness) {
-        ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
-        ev->ivs[0].fitness = ev->ivs[1].fitness;
-        ev->info.improovs++;
-      }
-    } else {
-      if (ev->ivs[0].fitness > ev->ivs[1].fitness) {
-        ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
-        ev->ivs[0].fitness = ev->ivs[1].fitness;
-        ev->info.improovs++;
-      }
-    }
+    EV_COPY_BETTER_IV(ev, 0, 1, *ev->opts);
 
     /**
      * prints status informations if wanted
@@ -1589,10 +1567,6 @@ static void ev_init_tc_and_ivs_greedy_serial(Evolution *ev) {
         EV_THREAD_SAVE_NEW_LINE;
     }
   }
-
-  /* copy best individual */
-  ev->clone_iv(ev->ivs[1].iv, ev->ivs[0].iv, *ev->opts);
-  ev->ivs[1].fitness = ev->ivs[0].fitness;
 
   if (ev->verbose >= EV_VERBOSE_HIGH)
     printf("Population Initialized\n");
@@ -1619,51 +1593,29 @@ static inline void evolute_ivs_seriel(Evolution *ev) {
  */
 static inline void greedy_ivs_seriel(Evolution *ev) {
   
-  
   int j;
 
   /* reset improovs */
   ev->info.improovs = 0;
 
   /* initialize generation best to greedy best */
-  ev->clone_iv(ev->ivs[1].iv, ev->ivs[0].iv, *ev->opts);
+  ev->clone_iv(ev->population[1]->iv, ev->population[0]->iv, *ev->opts);
+  ev->population[1]->fitness = ev->population[0]->fitness;
 
   for (j = 0; j < ev->greedy_size; j++) {
 
     /* copy greedy best and mutate it */
-    ev->clone_iv(ev->ivs[2].iv, ev->ivs[0].iv, *ev->opts);
-    ev->mutate(&ev->ivs[2], *ev->opts);
+    ev->clone_iv(ev->population[2]->iv, ev->population[0]->iv, *ev->opts);
+    ev->mutate(ev->population[2], *ev->opts);
 
     /* calculate fitness and set generation best if neccesary */
-    ev->ivs[2].fitness = ev->fitness(&ev->ivs[2], *ev->opts);
+    EV_CALC_FITNESS_AT(ev, 2, *ev->opts);
     
-    if (ev->sort_max) {
-      if (ev->ivs[1].fitness < ev->ivs[2].fitness) {
-        ev->clone_iv(ev->ivs[1].iv, ev->ivs[2].iv, *ev->opts);
-        ev->ivs[1].fitness = ev->ivs[2].fitness;
-        ev->info.improovs++;
-      }
-    } else {
-      if (ev->ivs[1].fitness > ev->ivs[2].fitness) {
-        ev->clone_iv(ev->ivs[1].iv, ev->ivs[2].iv, *ev->opts);
-        ev->ivs[1].fitness = ev->ivs[2].fitness;
-        ev->info.improovs++;
-      }
-    }
+    EV_COPY_BETTER_IV(ev, 1, 2, *ev->opts);
   }
 
   /* set greedy best if generation best is better */
-  if (ev->sort_max) {
-    if (ev->ivs[0].fitness < ev->ivs[1].fitness) {
-      ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
-      ev->ivs[0].fitness = ev->ivs[1].fitness;
-    }
-  } else {
-    if (ev->ivs[0].fitness > ev->ivs[1].fitness) {
-      ev->clone_iv(ev->ivs[0].iv, ev->ivs[1].iv, *ev->opts);
-      ev->ivs[0].fitness = ev->ivs[1].fitness;
-    }
-  }
+  EV_COPY_BETTER_IV(ev, 0, 1, *ev->opts);
 }
 
 /**
@@ -1713,8 +1665,7 @@ static void seriel_recombinate(Evolution *ev) {
     }
 
     /* calculate the fittnes for the new individuals */
-    ev->population[j]->fitness = ev->fitness(ev->population[j], 
-                                             *ev->opts);
+    EV_CALC_FITNESS_AT(ev, j, *ev->opts);
 
     /**
      * store if the new individual is better as the old one
@@ -1775,21 +1726,21 @@ static void seriel_mutation_onely_1half(Evolution *ev) {
                *ev->opts);
  
     /* calculate the fittnes for the new individual */
-    EV_CALC_FITNESS_AT(*ev, j, *ev->opts);
+    EV_CALC_FITNESS_AT(ev, j, *ev->opts);
     
     /**
      * store if the new individual is better as the old one
      */
     if (ev->sort_max) {
-      if (EV_FITNESS_AT(*ev, j) > 
-          EV_FITNESS_AT(*ev, j - ev->overall_start)) {
+      if (EV_FITNESS_AT(ev, j) > 
+          EV_FITNESS_AT(ev, j - ev->overall_start)) {
  
         ev->info.improovs++;
       }
  
     } else {
-      if (EV_FITNESS_AT(*ev, j) <
-          EV_FITNESS_AT(*ev, j - ev->overall_start)) {
+      if (EV_FITNESS_AT(ev, j) <
+          EV_FITNESS_AT(ev, j - ev->overall_start)) {
  
         ev->info.improovs++;
       }
@@ -1836,8 +1787,7 @@ static void seriel_mutation_onely_rand(Evolution *ev) {
     ev->mutate(ev->population[j], *ev->opts);
  
     /* calculate the fittnes for the new individual */
-    ev->population[j]->fitness = ev->fitness(ev->population[j], 
-                                             *ev->opts);
+    EV_CALC_FITNESS_AT(ev, j, *ev->opts);
    
     /**
      * store if the new individual is better as the old one
