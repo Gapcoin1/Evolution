@@ -226,7 +226,7 @@ static inline char ev_equal(Individual *a, Individual *b) {
   } while (0)
 
 /* macro to copy one individual to an other if it is better */
-#define EV_COPY_BETTER_IV(EV, ID_DST, ID_SRC, OPTS)               \
+#define EV_COPY_GREEDY(EV, ID_DST, ID_SRC, OPTS)                  \
 do {                                                              \
   if ((EV)->sort_max) {                                           \
     if (EV_FITNESS_AT(EV, ID_DST) < EV_FITNESS_AT(EV, ID_SRC)) {  \
@@ -243,6 +243,30 @@ do {                                                              \
                      OPTS);                                       \
                                                                   \
       EV_FITNESS_AT(EV, ID_DST) = EV_FITNESS_AT(EV, ID_SRC);      \
+    }                                                             \
+  }                                                               \
+} while (0)
+
+/* also count improoves in this */
+#define EV_COPY_GREEDY_COUNT(EV, ID_DST, ID_SRC, OPTS, COUNT)     \
+do {                                                              \
+  if ((EV)->sort_max) {                                           \
+    if (EV_FITNESS_AT(EV, ID_DST) < EV_FITNESS_AT(EV, ID_SRC)) {  \
+      (EV)->clone_iv((EV)->population[ID_DST]->iv,                \
+                     (EV)->population[ID_SRC]->iv,                \
+                     OPTS);                                       \
+                                                                  \
+      EV_FITNESS_AT(EV, ID_DST) = EV_FITNESS_AT(EV, ID_SRC);      \
+      (COUNT)++;                                                  \
+    }                                                             \
+  } else {                                                        \
+    if (EV_FITNESS_AT(EV, ID_DST) > EV_FITNESS_AT(EV, ID_SRC)) {  \
+      (EV)->clone_iv((EV)->population[ID_DST]->iv,                \
+                     (EV)->population[ID_SRC]->iv,                \
+                     OPTS);                                       \
+                                                                  \
+      EV_FITNESS_AT(EV, ID_DST) = EV_FITNESS_AT(EV, ID_SRC);      \
+      (COUNT)++;                                                  \
     }                                                             \
   }                                                               \
 } while (0)
@@ -784,7 +808,7 @@ static void *threadable_greedy_init_iv(void *arg) {
     EV_CALC_FITNESS_AT(ev, start + 1, evt->opt);
 
     /* set best individual if neccesary */
-    EV_COPY_BETTER_IV(ev, start, start + 1, evt->opt);
+    EV_COPY_GREEDY_COUNT(ev, start, start + 1, evt->opt, evt->improovs);
 
     /**
      * prints status informations if wanted
@@ -1425,7 +1449,7 @@ static void *threadable_greedy(void *arg) {
     /* calculate fitness and set generation best if neccesary */
     EV_CALC_FITNESS_AT(ev, start + 2, evt->opt);
     
-    EV_COPY_BETTER_IV(ev, start + 1, start + 2, evt->opt);
+    EV_COPY_GREEDY_COUNT(ev, start + 1, start + 2, evt->opt, evt->improovs);
 
     /**
      * print status informations if wanted
@@ -1439,7 +1463,7 @@ static void *threadable_greedy(void *arg) {
   }
 
   /* set greedy best if generation best is better */
-  EV_COPY_BETTER_IV(ev, start, start + 1, evt->opt);
+  EV_COPY_GREEDY(ev, start, start + 1, evt->opt);
 
   return NULL;
 }
@@ -1555,7 +1579,7 @@ static void ev_init_tc_and_ivs_greedy_serial(Evolution *ev) {
     EV_CALC_FITNESS_AT(ev, 1, *ev->opts);
 
     /* set best individual if neccesary */
-    EV_COPY_BETTER_IV(ev, 0, 1, *ev->opts);
+    EV_COPY_GREEDY_COUNT(ev, 0, 1, *ev->opts, ev->info.improovs);
 
     /**
      * prints status informations if wanted
@@ -1611,11 +1635,11 @@ static inline void greedy_ivs_seriel(Evolution *ev) {
     /* calculate fitness and set generation best if neccesary */
     EV_CALC_FITNESS_AT(ev, 2, *ev->opts);
     
-    EV_COPY_BETTER_IV(ev, 1, 2, *ev->opts);
+    EV_COPY_GREEDY_COUNT(ev, 1, 2, *ev->opts, ev->info.improovs);
   }
 
   /* set greedy best if generation best is better */
-  EV_COPY_BETTER_IV(ev, 0, 1, *ev->opts);
+  EV_COPY_GREEDY(ev, 0, 1, *ev->opts);
 }
 
 /**
